@@ -6,6 +6,7 @@ CFLAGS_DEBUG 	 = -Og -g $(CFLAGS_COMMON)
 CFLAGS_COMMON    = -MD -MP -Wall -Wextra -Werror
 CFLAGS_RELEASE   = -Os $(CFLAGS_COMMON) -DNDEBUG
 
+$(shell mkdir -p bin)
 
 $(EXECUTABLE_PATH): **.c
 	gcc $(CFLAGS_DEBUG) -o $@ main.c -lncurses
