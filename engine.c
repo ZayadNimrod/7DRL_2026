@@ -40,6 +40,8 @@ typedef struct {
 	Vector2Int position;
 	int inverse_speed;
 	int impetus_to_move; // When this hits inverse_speed, the player can move one tile.
+	int attack_delay;
+	int impetus_to_attack; // When this hits attack_delay, the player can move one tile.
 } Entity; 
 
 #define MAX_ENTITIES 4096
@@ -58,6 +60,7 @@ Entity init_player() {
 	player.type = PLAYER;
 	player.position = (Vector2Int){ LEVEL_WIDTH/2, LEVEL_HEIGHT/2 };
 	player.inverse_speed = 10;
+	player.attack_delay = 10;
 	return player;
 };
 
@@ -130,12 +133,31 @@ typedef struct {
 	enum Direction direction;
 } InputAction;
 
-int collides(Level* level, Vector2Int position) {
+typedef struct {
+	size_t entity_ids[32];
+	size_t count;
+} EntityIdList;
+
+EntityIdList entities_at_location(Level* level, Vector2Int position) {
+	EntityIdList result = {0};
 	for (size_t i=0; i<level->entity_count; i++) {
 		Entity* e = &level->entities[i];
+		if (e->type == NONE) continue;
 		if (e->position.x == position.x && e->position.y == position.y) {
-			if (e->type == WALL) return 1;
+			// NOTE! result.count can overflow if too many items are in the same place! 
+			// If it does, it will be funny :^)
+			result.entity_ids[result.count++] = i;
 		}
+	}
+	return result;
+}
+
+int collides(Level* level, Vector2Int position) {
+	EntityIdList entities_there = entities_at_location(level, position);
+	for (size_t i=0; i<entities_there.count; i++) {
+		Entity* e = &level->entities[i];
+		if (e->type == NONE) continue;
+		return 1;
 	}
 	return 0;
 }
