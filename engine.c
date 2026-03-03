@@ -81,14 +81,6 @@ Level init_level(
 	return level;
 };
 
-char entity_char(Entity* entity) {
-	switch (entity->type) {
-		case NONE: return ' ';
-		case PLAYER: return '@';
-		case WALL: return '#';
-		default: return ' ';
-	}
-}
 
 void print_level(Level* level) {
 	char tiles[LEVEL_WIDTH][LEVEL_HEIGHT] = {0};
