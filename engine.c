@@ -80,19 +80,3 @@ Level init_level(
 
 	return level;
 };
-
-
-void print_level(Level* level) {
-	char tiles[LEVEL_WIDTH][LEVEL_HEIGHT] = {0};
-	for (unsigned i=0; i<level->entity_count; i++) {
-		Entity* e = &level->entities[i];
-		tiles[e->x][e->y] = entity_char(e);
-	}
-	for (int y=0; y<LEVEL_HEIGHT; y++) {
-		for (int x=0; x<LEVEL_WIDTH; x++) {
-			char c = tiles[x][y];
-			printf("%c", c ? c : ' ');
-		}
-		printf("\n");
-	}
-}

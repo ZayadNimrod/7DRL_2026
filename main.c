@@ -1,19 +1,27 @@
 
-#include <ncurses.h>
 #include "engine.c"
+#include <ncurses.h>
 
+typedef struct {
+    char character;
+    int attributes;
+} display_t;
 
+display_t entity_char(Entity* entity)
+{
 
-
-char entity_char(Entity* entity) {
-	switch (entity->type) {
-		case NONE: return ' ';
-		case PLAYER: return '@';
-		case WALL: return '#';
-		default: return ' ';
-	}
+    switch (entity->type) {
+    case NONE:
+		return (display_t){ .character = ' ', .attributes = A_NORMAL };
+    case PLAYER:
+        return (display_t){ .character = '@', .attributes = A_BOLD };
+    case WALL:
+        return (display_t){ .character = '#', .attributes = A_NORMAL };
+    default:
+        return (display_t){ .character = '?', .attributes = A_BLINK };
+        
+    }
 }
-
 
 void render(Level* world)
 {
@@ -29,15 +37,16 @@ void render(Level* world)
         mvaddstr(y, 0,blankline);
     }
 
-  
     for (unsigned i = 0; i < world->entity_count; i++) {
         Entity* e = &world->entities[i];
-        mvaddch(e->y,e->x, entity_char(e));
+		display_t d = entity_char(e);
+		attron(d.attributes);
+        mvaddch(e->y, e->x, d.character);
+		attroff(d.attributes);
     }
 
     refresh(); /* Print it on to the real screen */
 }
-
 
 int quit()
 {
