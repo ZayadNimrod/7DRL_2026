@@ -34,7 +34,8 @@ void render_map(Level* world)
         Entity* e = &world->entities[i];
         display_t d = entity_char(e);
         wattron(map_window, d.attributes);
-        mvwaddch(map_window, e->y, e->x, d.character);
+	Vector2Int position = e->position;
+        mvwaddch(map_window, position.x, position.y, d.character);
         wattroff(map_window, d.attributes);
     }
 

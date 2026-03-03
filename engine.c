@@ -10,10 +10,36 @@ enum EntityType {
 	TORCH,
 };
 
+enum Direction { STILL, NORTH, NORTH_EAST, EAST, SOUTH_EAST, SOUTH, SOUTH_WEST, WEST, NORTH_WEST };
+
 typedef struct {
-	enum EntityType type;
 	int x;
 	int y;
+} Vector2Int;
+
+Vector2Int vec2add(Vector2Int a, Vector2Int b) { Vector2Int result = { a.x + b.x, a.y + b.y }; return result; }
+
+Vector2Int from_direction(enum Direction d) {
+	Vector2Int result;
+	switch(d) {
+		case NORTH: result = (Vector2Int){0, -1}; break;
+		case NORTH_EAST: result = (Vector2Int){1, -1}; break;
+		case EAST: result = (Vector2Int){1, 0}; break;
+		case SOUTH_EAST: result = (Vector2Int){1, 1}; break;
+		case SOUTH: result = (Vector2Int){0, 1}; break;
+		case SOUTH_WEST: result = (Vector2Int){-1, 1}; break;
+		case WEST: result = (Vector2Int){-1, 0}; break;
+		case NORTH_WEST: result = (Vector2Int){-1, -1}; break;
+		default: result = (Vector2Int){0, 0};
+	}
+	return result;
+}
+
+typedef struct {
+	enum EntityType type;
+	Vector2Int position;
+	int inverse_speed;
+	int impetus_to_move; // When this hits inverse_speed, the player can move one tile.
 } Entity; 
 
 #define MAX_ENTITIES 4096
@@ -28,10 +54,10 @@ typedef struct {
 // Entity #0 is always the player
 
 Entity init_player() {
-	Entity player;
+	Entity player = {0};
 	player.type = PLAYER;
-	player.x = LEVEL_WIDTH/2;
-	player.y = LEVEL_HEIGHT/2;
+	player.position = (Vector2Int){ LEVEL_WIDTH/2, LEVEL_HEIGHT/2 };
+	player.inverse_speed = 10;
 	return player;
 };
 
@@ -46,10 +72,9 @@ unsigned add_entity(Level* level, Entity entity) {
 }
 
 unsigned add_wall(Level* level, int x, int y) {
-	Entity wall;
+	Entity wall = {0};
 	wall.type = WALL;
-	wall.x = x;
-	wall.y = y;
+	wall.position = (Vector2Int){ x, y };
 	return add_entity(level, wall);
 }
 
@@ -80,3 +105,58 @@ Level init_level(
 
 	return level;
 };
+
+void print_level(Level* level) {
+	char tiles[LEVEL_WIDTH][LEVEL_HEIGHT] = {0};
+	for (unsigned i=0; i<level->entity_count; i++) {
+		Entity* e = &level->entities[i];
+		tiles[e->position.x][e->position.y] = '.'; // TODO: maybe fix this
+	}
+	for (int y=0; y<LEVEL_HEIGHT; y++) {
+		for (int x=0; x<LEVEL_WIDTH; x++) {
+			char c = tiles[x][y];
+			printf("%c", c ? c : ' ');
+		}
+		printf("\n");
+	}
+}
+
+enum ActionType {
+	WAIT, WALK, ATTACK
+};
+
+typedef struct {
+	enum ActionType type;
+	enum Direction direction;
+} InputAction;
+
+int entity_walk(Level* level, size_t entity_id, enum Direction direction) {
+	Entity* entity = &level->entities[entity_id];
+	if (direction != STILL && ++entity->impetus_to_move >= entity->inverse_speed) {
+		entity->impetus_to_move = 0;
+		entity->position = vec2add(entity->position, from_direction(direction));
+		return 1;
+	}
+	return 0;
+}
+
+/**
+ * Runs the simulation for one game tick.
+ * If this returns zero, you should call this again before getting another input
+ * from the player.
+ */
+int tick_level(Level* level, InputAction input) {
+	int get_more_input = 0;
+	enum Direction direction = input.direction;
+	switch (input.type) {
+		case WALK:
+			if (direction >= NORTH && direction <= NORTH_WEST) {
+				int has_moved = entity_walk(level, 0 /* player is entity 0 */, direction);
+				// Stop ticking the simulation if we've already moved:
+				if (!has_moved) get_more_input = 1;
+			}
+			break;
+		default:
+	}
+	return get_more_input;
+}
