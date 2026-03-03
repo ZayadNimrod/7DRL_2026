@@ -20,7 +20,7 @@ run: build
 clean:
 	rm bin/*
 
-tests/engine_test:
+tests/engine_test: engine.c engine_test.c
 	gcc $(CFLAGS_DEBUG) -o tests/engine_test engine_test.c $(CLIBS)
 
 test: tests/engine_test
