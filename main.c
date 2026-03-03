@@ -1,5 +1,6 @@
 
 #include "engine.c"
+#include "log.c"
 #include <ncurses.h>
 
 typedef struct {
@@ -12,40 +13,50 @@ display_t entity_char(Entity* entity)
 
     switch (entity->type) {
     case NONE:
-		return (display_t){ .character = ' ', .attributes = A_NORMAL };
+        return (display_t) { .character = ' ', .attributes = A_NORMAL };
     case PLAYER:
-        return (display_t){ .character = '@', .attributes = A_BOLD };
+        return (display_t) { .character = '@', .attributes = A_BOLD };
     case WALL:
-        return (display_t){ .character = '#', .attributes = A_NORMAL };
+        return (display_t) { .character = '#', .attributes = A_NORMAL };
     default:
-        return (display_t){ .character = '?', .attributes = A_BLINK };
-        
+        return (display_t) { .character = '?', .attributes = A_BLINK };
     }
 }
 
-void render(Level* world)
-{
-    // Clear the screen
-    move(0, 0);
-    char blankline[LEVEL_WIDTH + 1];
-    for (int i = 0; i < LEVEL_WIDTH; i++) {
-        blankline[i] = ' ';
-    }
-    blankline[LEVEL_WIDTH] = 0;
+WINDOW* map_window;
+WINDOW* log_window;
 
-    for (int y = 0; y < LEVEL_HEIGHT; y++) {
-        mvaddstr(y, 0,blankline);
-    }
+void render_map(Level* world)
+{
+    wclear(map_window);
 
     for (unsigned i = 0; i < world->entity_count; i++) {
         Entity* e = &world->entities[i];
-		display_t d = entity_char(e);
-		attron(d.attributes);
-        mvaddch(e->y, e->x, d.character);
-		attroff(d.attributes);
+        display_t d = entity_char(e);
+        wattron(map_window, d.attributes);
+        mvwaddch(map_window, e->y, e->x, d.character);
+        wattroff(map_window, d.attributes);
     }
 
-    refresh(); /* Print it on to the real screen */
+    wrefresh(map_window);
+}
+
+void render_log(logger_t* logger)
+{
+    wclear(log_window);
+    for (unsigned i = 0; i < logger->max_logs; i++) {
+        wmove(log_window, i, 0);
+        unsigned idx = (logger->idx + i) % logger->max_logs;
+        char* log = logger->logs[idx];
+        waddstr(log_window, log);
+    }
+    wrefresh(log_window);
+}
+
+void render(Level* world, logger_t* logger)
+{
+    render_map(world);
+    render_log(logger);
 }
 
 int quit()
@@ -61,18 +72,34 @@ int main()
     Level level = { 0 };
     level = init_level(0, &level);
 
-    initscr(); /* Start curses mode 		    */
+    initscr();
     curs_set(0); // hide cursor
     noecho();
 
+    const int MAX_LOGS = LEVEL_HEIGHT / 2;
+    const int MAX_LOG_LEN = 120 - LEVEL_WIDTH;
+
+    map_window = newwin(LEVEL_HEIGHT, LEVEL_WIDTH, 0, 0);
+    log_window = newwin(MAX_LOGS, MAX_LOG_LEN, LEVEL_HEIGHT - MAX_LOGS, LEVEL_WIDTH);
+
+    logger_t logger = init_logger(MAX_LOGS, MAX_LOG_LEN);
+
+    log_msg(&logger, "This is a log");
+    log_msg(&logger, "This is another log");
+    log_msg(&logger, "Here is another log that is so long that it should go over multiple lines beep boop bap bop.");
+
     while (true) {
-        render(&level);
+        render(&level,&logger);
 
         char input = getch();
 
         switch (input) {
         case 'q':
             return quit();
+		case '?':
+			log_msg(&logger, "TODO: Explain controls");
+			break;
+
         default:
             break;
         }
