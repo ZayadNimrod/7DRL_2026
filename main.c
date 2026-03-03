@@ -69,12 +69,14 @@ int quit()
 int main()
 {
 
-    Level level = { 0 };
-    level = init_level(0, &level);
-
     initscr();
     curs_set(0); // hide cursor
     noecho();
+	clear();
+	refresh();
+
+    Level level = { 0 };
+    level = init_level(0, &level);
 
     const int MAX_LOGS = LEVEL_HEIGHT / 2;
     const int MAX_LOG_LEN = 120 - LEVEL_WIDTH;
