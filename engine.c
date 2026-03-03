@@ -43,8 +43,8 @@ typedef struct {
 } Entity; 
 
 #define MAX_ENTITIES 4096
-#define LEVEL_WIDTH 60
-#define LEVEL_HEIGHT 30
+#define LEVEL_WIDTH 15
+#define LEVEL_HEIGHT 9
 
 typedef struct {
 	Entity entities[MAX_ENTITIES];
@@ -130,11 +130,31 @@ typedef struct {
 	enum Direction direction;
 } InputAction;
 
+int collides(Level* level, Vector2Int position) {
+	for (size_t i=0; i<level->entity_count; i++) {
+		Entity* e = &level->entities[i];
+		if (e->position.x == position.x && e->position.y == position.y) {
+			if (e->type == WALL) return 1;
+		}
+	}
+	return 0;
+}
+
+/**
+ * Tries to walk.
+ * Returns 1 if the entity walks successfully
+ * Returns 0 if the entity will walk when their impetus is enough
+ * Returns -1 if the entity is blocked
+ */
 int entity_walk(Level* level, size_t entity_id, enum Direction direction) {
 	Entity* entity = &level->entities[entity_id];
+	Vector2Int desired_position = vec2add(entity->position, from_direction(direction));
+	if (collides(level, desired_position)) {
+		return -1;
+	}
 	if (direction != STILL && ++entity->impetus_to_move >= entity->inverse_speed) {
 		entity->impetus_to_move = 0;
-		entity->position = vec2add(entity->position, from_direction(direction));
+		entity->position = desired_position;
 		return 1;
 	}
 	return 0;
@@ -152,7 +172,7 @@ int tick_level(Level* level, InputAction input) {
 		case WALK:
 			if (direction >= NORTH && direction <= NORTH_WEST) {
 				int has_moved = entity_walk(level, 0 /* player is entity 0 */, direction);
-				// Stop ticking the simulation if we've already moved:
+				// Simluate more ticks unless we've finished moving:
 				if (!has_moved) get_more_input = 1;
 			}
 			break;
