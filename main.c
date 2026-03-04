@@ -26,6 +26,12 @@ display_t entity_char(Entity* entity)
 
 WINDOW* map_window;
 WINDOW* log_window;
+WINDOW* stat_window;
+
+
+void render_stats(Level* world){
+    (void)world;
+}
 
 void render_map(Level* world)
 {
@@ -69,6 +75,7 @@ void render(Level* world, logger_t* logger)
 {
     render_map(world);
     render_log(logger);
+    render_stats(world);
 }
 
 int quit()
@@ -95,6 +102,7 @@ int main()
 
     map_window = newwin(LEVEL_HEIGHT, LEVEL_WIDTH, 0, 0);
     log_window = newwin(MAX_LOGS, MAX_LOG_LEN, LEVEL_HEIGHT - MAX_LOGS, LEVEL_WIDTH);
+    stat_window = newwin(LEVEL_HEIGHT-MAX_LOGS-1, MAX_LOG_LEN, 0, LEVEL_WIDTH);
 
     logger_t logger = init_logger(MAX_LOGS, MAX_LOG_LEN);
 
