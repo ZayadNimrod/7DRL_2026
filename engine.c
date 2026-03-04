@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "log.c"
 
 
 enum EntityType {
@@ -51,9 +52,15 @@ typedef struct {
 #define LEVEL_HEIGHT 9
 
 typedef struct {
+	size_t entity_ids[32];
+	size_t count;
+} EntityIdList;
+
+typedef struct {
 	Entity entities[MAX_ENTITIES];
 	unsigned entity_count;
 	int level_number;
+	EntityIdList by_tile[LEVEL_WIDTH][LEVEL_HEIGHT];
 } Level;
 // Entity #0 is always the player
 
@@ -72,7 +79,7 @@ unsigned add_entity(Level* level, Entity entity) {
 	unsigned ec = level->entity_count++;
 	if (ec >= MAX_ENTITIES) {
 		// UH OH!!
-		printf("We hit the entity limit!\n");
+		// TODO: log_msg("We hit the entity limit!\n");
 	}
 	level->entities[ec] = entity;
 	return ec;
@@ -130,13 +137,15 @@ void print_level(Level* level) {
 			tiles[p.x][p.y] = '.'; // TODO: maybe fix this
 		}
 	}
+	/*
 	for (int y=0; y<LEVEL_HEIGHT; y++) {
 		for (int x=0; x<LEVEL_WIDTH; x++) {
 			char c = tiles[x][y];
-			printf("%c", c ? c : ' ');
+			// TODO: log_msg("%c", c ? c : ' ');
 		}
-		printf("\n");
+		// TODO: log_msg("\n");
 	}
+	*/
 }
 
 enum ActionType {
@@ -147,11 +156,6 @@ typedef struct {
 	enum ActionType type;
 	Vector2Int target;
 } InputAction;
-
-typedef struct {
-	size_t entity_ids[32];
-	size_t count;
-} EntityIdList;
 
 EntityIdList entities_at_location(Level* level, Vector2Int position) {
 	EntityIdList result = {0};
@@ -171,10 +175,10 @@ EntityIdList entities_at_location(Level* level, Vector2Int position) {
 int deal_damage(Level* level, size_t target_id, int damage) {
 	Entity* target = &level->entities[target_id];
 	target->hp -= damage;
-	printf("Did %d damage to entity %ld\n", damage, target_id);
+	// TODO: log_msg("Did %d damage to entity %ld\n", damage, target_id);
 	if (target->hp <= 0) {
 		target->type = NONE;
-		printf("entity %ld died\n", target_id);
+		// TODO: log_msg("entity %ld died\n", target_id);
 	}
 	return damage;
 }
@@ -243,3 +247,62 @@ int tick_level(Level* level, InputAction input) {
 	}
 	return get_more_input;
 }
+
+void make_lookup(Level* level) {
+	// Level Generation
+	for (int x=0; x<LEVEL_WIDTH; x++) {
+		for (int y=0; y<LEVEL_HEIGHT; y++) {
+			level->by_tile[x][y] = entities_at_location(level, (Vector2Int){x,y});
+		}
+	}
+}
+
+typedef struct {
+	int distance[LEVEL_WIDTH][LEVEL_HEIGHT];
+	Vector2Int target;
+} PathfindingResult;
+
+void _pathfind(Level* level, PathfindingResult* result, Vector2Int p, int distance) {
+	if (p.x < 0) return;
+	if (p.y < 0) return;
+	if (p.x > LEVEL_WIDTH) return;
+	if (p.y < LEVEL_HEIGHT) return;
+	result->distance[p.x][p.y] = distance;
+	if (distance < 0) return;
+	for (int x=p.x-1; x<=p.x+1; x++) {
+		for (int y=p.y-1; y<=p.y+1; y++) {
+			if (x < 0) continue;
+			if (y < 0) continue;
+			if (x > LEVEL_WIDTH) continue;
+			if (y < LEVEL_HEIGHT) continue;
+			if (x == result->target.x && y == result->target.y) continue;
+			if (result->distance[x][y] > distance) continue;
+			Vector2Int loc = {x,y};
+			EntityIdList* es = &level->by_tile[x][y];
+			int blocked = 0;
+			for (size_t i=0; i<es->count; i++) {
+				size_t e_id = es->entity_ids[i];
+				Entity* e = &level->entities[e_id];
+				switch (e->type) {
+					case WALL:
+					case ENEMY: 
+						blocked = 1;
+					default:
+				}
+			}
+			if (blocked) _pathfind(level, result, loc, -1);
+			else _pathfind(level, result, loc, distance+1);
+		}
+	}
+}
+
+/**
+ * Uses depth-first search to find the shortest distance to target from any point in the level
+ */
+PathfindingResult pathfind(Level* level, Vector2Int target) {
+	PathfindingResult result = {0};
+	result.target = target;
+	_pathfind(level, &result, target, 0);
+	return result;
+}
+
