@@ -1,0 +1,42 @@
+In file included from main.c:2:
+engine.c: In function ‘print_level’:
+engine.c:142:30: error: unused variable ‘c’ [-Werror=unused-variable]
+  142 |                         char c = tiles[x][y];
+      |                              ^
+engine.c: In function ‘make_lookup’:
+engine.c:253:30: error: ‘level’ is a pointer; did you mean to use ‘->’?
+  253 |                         level.by_tile[x][y] = entities_at_location(level, (Vector2Int){x,y});
+      |                              ^
+      |                              ->
+engine.c: In function ‘pathfind’:
+engine.c:269:9: error: implicit declaration of function ‘_pathfind’; did you mean ‘pathfind’? [-Wimplicit-function-declaration]
+  269 |         _pathfind(level, &result, target, 0);
+      |         ^~~~~~~~~
+      |         pathfind
+engine.c: At top level:
+engine.c:273:6: error: conflicting types for ‘_pathfind’; have ‘void(Level *, PathfindingResult *, Vector2Int,  int)’ [-Werror]
+  273 | void _pathfind(Level* level, PathfindingResult* result, Vector2Int p, int distance) {
+      |      ^~~~~~~~~
+engine.c:269:9: note: previous implicit declaration of ‘_pathfind’ with type ‘void(Level *, PathfindingResult *, Vector2Int,  int)’
+  269 |         _pathfind(level, &result, target, 0);
+      |         ^~~~~~~~~
+engine.c: In function ‘_pathfind’:
+engine.c:278:26: error: ‘x’ undeclared (first use in this function)
+  278 |         result->distance[x][y] = distance;
+      |                          ^
+engine.c:278:26: note: each undeclared identifier is reported only once for each function it appears in
+engine.c:278:29: error: ‘y’ undeclared (first use in this function)
+  278 |         result->distance[x][y] = distance;
+      |                             ^
+engine.c:286:65: error: ‘result’ is a pointer; did you mean to use ‘->’?
+  286 |                         if (x == result->target.x && y == result.target.y) continue;
+      |                                                                 ^
+      |                                                                 ->
+engine.c:291:44: error: ‘entities_there’ undeclared (first use in this function)
+  291 |                         for (size_t i=0; i<entities_there.count; i++) {
+      |                                            ^~~~~~~~~~~~~~
+engine.c:289:39: error: unused variable ‘es’ [-Werror=unused-variable]
+  289 |                         EntityIdList* es = &level->by_tile[x][y];
+      |                                       ^~
+cc1: all warnings being treated as errors
+make: *** [Makefile:13: bin/7drl] Error 1
