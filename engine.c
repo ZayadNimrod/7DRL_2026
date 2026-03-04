@@ -1,15 +1,14 @@
-
+#include "entities.c"
 #include "log.c"
 #include "vector2int.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
+char log_buf[1024];
 
 #include "ecs.c"
 #include "level_gen.c"
-
-char log_buf[1024];
 
 Entity init_player()
 {
@@ -149,7 +148,34 @@ typedef struct {
 	Vector2Int target;
 } InputAction;
 
-int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage) {
+EntityIdList entities_at_location(Level* level, Vector2Int position)
+{
+	EntityIdList result = { 0 };
+	for (size_t i = 0; i < level->entity_count; i++) {
+		Entity* e = &level->entities[i];
+		if (e->type == NONE)
+			continue;
+		if (e->position.x == position.x && e->position.y == position.y) {
+			// NOTE! result.count can overflow if too many items are in the same place!
+			// If it does, it will be funny :^)
+			result.entity_ids[result.count++] = i;
+		}
+	}
+	return result;
+}
+
+void make_lookup(Level* level)
+{
+	// Level Generation
+	for (int x = 0; x < LEVEL_WIDTH; x++) {
+		for (int y = 0; y < LEVEL_HEIGHT; y++) {
+			level->by_tile[x][y] = entities_at_location(level, (Vector2Int) { x, y });
+		}
+	}
+}
+
+int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage)
+{
 	Entity* attacker = &level->entities[attacker_id];
 	Entity* target = &level->entities[target_id];
 	target->hp -= damage;
