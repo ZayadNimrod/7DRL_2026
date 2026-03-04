@@ -45,11 +45,19 @@ void render_map(Level* world)
 void render_log(logger_t* logger)
 {
     wclear(log_window);
-    for (unsigned i = 0; i < logger->max_logs; i++) {
-        wmove(log_window, i, 0);
-        unsigned idx = (logger->idx + i) % logger->max_logs;
-        char* log = logger->logs[idx];
-        waddstr(log_window, log);
+    if (logger->total_logs>=logger->max_logs){
+        for (unsigned i = 0; i < logger->max_logs; i++) {
+            wmove(log_window, i, 0);
+            unsigned idx = (logger->idx + i) % logger->max_logs;
+            char* log = logger->logs[idx];
+            waddstr(log_window, log);
+        }
+    } else{
+        for (unsigned i = 0; i < logger->total_logs; i++) {
+            wmove(log_window, i, 0);
+            char* log = logger->logs[i];
+            waddstr(log_window, log);
+        }
     }
     wrefresh(log_window);
 }
