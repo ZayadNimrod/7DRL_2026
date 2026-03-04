@@ -18,7 +18,7 @@ display_t entity_char(Entity* entity)
 	case WALL:
 		return (display_t) { .character = '#', .attributes = A_NORMAL };
 	case ENEMY:
-		return (display_t) { .character = 'e', .attributes = A_NORMAL };		
+		return (display_t) { .character = 'e', .attributes = COLOR_PAIR(1)};        
 	default:
 		return (display_t) { .character = '?', .attributes = A_BLINK };
 	}
@@ -92,6 +92,17 @@ int main()
 	logger_t logger = *init_logger(MAX_LOGS, MAX_LOG_LEN);
 
 	initscr();
+	start_color();
+	init_pair(0, COLOR_WHITE, COLOR_BLACK);
+	init_pair(1, COLOR_RED, COLOR_BLACK);
+	//init_pair(2, COLOR_ORANGE, COLOR_BLACK);
+	init_pair(2, COLOR_YELLOW, COLOR_BLACK);
+	init_pair(3, COLOR_GREEN, COLOR_BLACK);
+	init_pair(4, COLOR_CYAN, COLOR_BLACK);
+	init_pair(5, COLOR_BLUE, COLOR_BLACK);
+	init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
+	
+
 	curs_set(0); // hide cursor
 	noecho();
 	clear();
