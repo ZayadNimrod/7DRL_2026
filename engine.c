@@ -1,46 +1,26 @@
+#include "entities.c"
+#include "log.c"
+#include "vector2int.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
-#include "log.c"
-#include "entities.c"
-#include "vector2int.h"
 
 char log_buf[1024];
 
-enum Direction { STILL, NORTH, NORTH_EAST, EAST, SOUTH_EAST, SOUTH, SOUTH_WEST, WEST, NORTH_WEST };
+#include "ecs.c"
+#include "level_gen.c"
 
-Vector2Int from_direction(enum Direction d) {
-	Vector2Int result;
-	switch(d) {
-		case NORTH: result = (Vector2Int){0, -1}; break;
-		case NORTH_EAST: result = (Vector2Int){1, -1}; break;
-		case EAST: result = (Vector2Int){1, 0}; break;
-		case SOUTH_EAST: result = (Vector2Int){1, 1}; break;
-		case SOUTH: result = (Vector2Int){0, 1}; break;
-		case SOUTH_WEST: result = (Vector2Int){-1, 1}; break;
-		case WEST: result = (Vector2Int){-1, 0}; break;
-		case NORTH_WEST: result = (Vector2Int){-1, -1}; break;
-		default: result = (Vector2Int){0, 0};
-	}
-	return result;
-}
-
-#define MAX_ENTITIES 4096
-#define LEVEL_WIDTH 60
-#define LEVEL_HEIGHT 30
-
-typedef struct {
-	size_t entity_ids[32];
-	size_t count;
-} EntityIdList;
-
-typedef struct {
-	Entity entities[MAX_ENTITIES];
-	unsigned entity_count;
-	int level_number;
-	EntityIdList by_tile[LEVEL_WIDTH][LEVEL_HEIGHT];
-	logger_t* logger;
-} Level;
+Entity init_player()
+{
+	Entity player = { 0 };
+	player.type = PLAYER;
+	player.position = (Vector2Int) { LEVEL_WIDTH / 2, LEVEL_HEIGHT / 2 };
+	player.inverse_speed = 10;
+	player.attack_delay = 10;
+	player.hp = 10;
+	player.damage = 5;
+	return player;
+};
 
 EntityIdList entities_at_location(Level* level, Vector2Int position) {
 	EntityIdList result = {0};
@@ -66,48 +46,33 @@ void make_lookup(Level* level) {
 }
 
 Level init_level(
-	int level_number, 
+	int level_number,
 	Level* prev_level,
-	logger_t* logger
-) {
-	Level level = {0};
+	logger_t* logger)
+{
+	Level level = { 0 };
 	level.logger = logger;
 	level.level_number = level_number;
 	if (prev_level->entities[0].type != PLAYER) {
 		// Create a new player
 		Player(&level.entities[0]);
-		Position(&level.entities[0], LEVEL_WIDTH/2, LEVEL_HEIGHT/2);
+		Position(&level.entities[0], LEVEL_WIDTH / 2, LEVEL_HEIGHT / 2);
 	} else {
 		// Copy the player from the previous level
 		memcpy(&level.entities[0], &prev_level->entities[0], sizeof(Entity));
 	}
 	level.entity_count = 1;
 
-	// Level Generation
-	for (int x=1; x<LEVEL_WIDTH-1; x++) {
-		Wall(&level.entities[level.entity_count++], x, 0);
-		Wall(&level.entities[level.entity_count++], x, LEVEL_HEIGHT-1);
-	}
-	for (int y=1; y<LEVEL_HEIGHT-1; y++) {
-		Wall(&level.entities[level.entity_count++], 0, y);
-		Wall(&level.entities[level.entity_count++], LEVEL_WIDTH-1, y);
-	}
-
-	Goblin(&level.entities[level.entity_count++], 2, 2);
-
-	// Spawn some items
-	Health(&level.entities[level.entity_count++], 5, 5, 10);
-	Gold(&level.entities[level.entity_count++], 8, 10, 10);
-	Armor(&level.entities[level.entity_count++], 15, 15, 10);
-	Arrows(&level.entities[level.entity_count++], 20, 20, 10);
+	generate_level(&level);
 
 	make_lookup(&level);
 	return level;
 };
 
-void print_level(Level* level) {
-	char tiles[LEVEL_WIDTH][LEVEL_HEIGHT] = {0};
-	for (unsigned i=0; i<level->entity_count; i++) {
+void print_level(Level* level)
+{
+	char tiles[LEVEL_WIDTH][LEVEL_HEIGHT] = { 0 };
+	for (unsigned i = 0; i < level->entity_count; i++) {
 		Entity* e = &level->entities[i];
 		Vector2Int p = e->position;
 		if (p.x < 0 || p.y < 0 || p.x >= LEVEL_WIDTH || p.y >= LEVEL_HEIGHT) {
@@ -115,8 +80,8 @@ void print_level(Level* level) {
 			tiles[p.x][p.y] = '.'; // TODO: maybe fix this
 		}
 	}
-	for (int y=0; y<LEVEL_HEIGHT; y++) {
-		for (int x=0; x<LEVEL_WIDTH; x++) {
+	for (int y = 0; y < LEVEL_HEIGHT; y++) {
+		for (int x = 0; x < LEVEL_WIDTH; x++) {
 			char c = tiles[x][y];
 			printf("%c", c ? c : ' ');
 		}
@@ -173,7 +138,9 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 }
 
 enum ActionType {
-	WAIT, WALK, ATTACK
+	WAIT,
+	WALK,
+	ATTACK
 };
 
 typedef struct {
@@ -195,9 +162,11 @@ int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage) 
 	return damage;
 }
 
-int entity_attack(Level* level, size_t attacker_id, size_t target_id) {
+int entity_attack(Level* level, size_t attacker_id, size_t target_id)
+{
 	Entity* attacker = &level->entities[attacker_id];
-	if (attacker->type == NONE) return -1;
+	if (attacker->type == NONE)
+		return -1;
 	if (++attacker->impetus_to_attack >= attacker->attack_delay) {
 		attacker->impetus_to_attack = 0;
 		return deal_damage(level, attacker_id, target_id, attacker->damage);
@@ -211,53 +180,68 @@ int entity_attack(Level* level, size_t attacker_id, size_t target_id) {
  * Returns 0 if the entity will walk when their impetus is enough
  * Returns -1 if the entity is blocked
  */
-int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
+int entity_walk(Level* level, size_t entity_id, Vector2Int target)
+{
 	Entity* entity = &level->entities[entity_id];
-	if (entity->type == NONE) return -1;
-	if (entity->inverse_speed == 0) return -1;
+	if (entity->type == NONE)
+		return -1;
+	if (entity->inverse_speed == 0)
+		return -1;
 
 	PathfindingResult path = pathfind(level, target);
 	Vector2Int p = entity->position;
 	int current_dist = path.distance[p.x][p.y];
-	Vector2Int dir = {0};
-	for (int x=p.x-1; x<=p.x+1; x++) {
-		for (int y=p.y-1; y<=p.y+1; y++) {
-			if (x < 0) continue;
-			if (y < 0) continue;
-			if (x >= LEVEL_WIDTH) continue;
-			if (y >= LEVEL_HEIGHT) continue;
-			if (x == p.x && y == p.y) continue;
+	Vector2Int dir = { 0 };
+	for (int x = p.x - 1; x <= p.x + 1; x++) {
+		for (int y = p.y - 1; y <= p.y + 1; y++) {
+			if (x < 0)
+				continue;
+			if (y < 0)
+				continue;
+			if (x >= LEVEL_WIDTH)
+				continue;
+			if (y >= LEVEL_HEIGHT)
+				continue;
+			if (x == p.x && y == p.y)
+				continue;
 			if (path.distance[x][y] < current_dist) {
-				dir.x = x-p.x;
-				dir.y = y-p.y;
+				dir.x = x - p.x;
+				dir.y = y - p.y;
 				current_dist = path.distance[x][y];
 			}
 		}
 	}
-	if (dir.x == 0 && dir.y == 0) return -1;
+	if (dir.x == 0 && dir.y == 0)
+		return -1;
 	Vector2Int desired_position = vec2add(entity->position, dir);
 
 	EntityIdList entities_there = entities_at_location(level, desired_position);
-	for (size_t i=0; i<entities_there.count; i++) {
+	for (size_t i = 0; i < entities_there.count; i++) {
 		size_t e_id = entities_there.entity_ids[i];
 		Entity* e = &level->entities[e_id];
-		if (e->bumpable) return entity_attack(level, entity_id, e_id);
-		if (e->blocking) return -1;
+		if (e->bumpable)
+			return entity_attack(level, entity_id, e_id);
+		if (e->blocking)
+			return -1;
 	}
 	entity->impetus_to_move++;
 	if (entity->impetus_to_move >= entity->inverse_speed) {
 		entity->impetus_to_move = 0;
 		entity->position = desired_position;
-		for (size_t i=0; i<entities_there.count; i++) {
+		for (size_t i = 0; i < entities_there.count; i++) {
 			size_t e_id = entities_there.entity_ids[i];
 			Entity* e = &level->entities[e_id];
 			if (e->type == ITEM) {
 				sprintf(log_buf, "Picked up %s", e->name);
 				log_msg(level->logger, log_buf);
-				if (e->hp) entity->hp += e->hp;
-				if (e->armor) entity->armor += e->armor;
-				if (e->arrows) entity->arrows += e->arrows;
-				if (e->gold) entity->gold += e->gold;
+				if (e->hp)
+					entity->hp += e->hp;
+				if (e->armor)
+					entity->armor += e->armor;
+				if (e->arrows)
+					entity->arrows += e->arrows;
+				if (e->gold)
+					entity->gold += e->gold;
 				e->type = NONE;
 			}
 			make_lookup(level);
@@ -272,24 +256,27 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
  * If this returns zero, you should call this again before getting another input
  * from the player.
  */
-int tick_level(Level* level, InputAction input) {
+int tick_level(Level* level, InputAction input)
+{
 	int get_more_input = 0;
 	switch (input.type) {
-		case WALK:
-			int has_moved = entity_walk(level, 0 /* player is entity 0 */, input.target);
-			// Simluate more ticks unless we've finished moving:
-			if (!has_moved) get_more_input = 1;
-			break;
-		case ATTACK: // TODO:
-		case WAIT:
-		default:
+	case WALK:
+		int has_moved = entity_walk(level, 0 /* player is entity 0 */, input.target);
+		// Simluate more ticks unless we've finished moving:
+		if (!has_moved)
+			get_more_input = 1;
+		break;
+	case ATTACK: // TODO:
+	case WAIT:
+	default:
 	}
 
-	for (size_t i=0; i<level->entity_count; i++) {
+	for (size_t i = 0; i < level->entity_count; i++) {
 		Entity* e = &level->entities[i];
 		if (e->aggro_entity_id >= 0) {
 			Entity* target = &level->entities[e->aggro_entity_id];
-			if (target->type != NONE) entity_walk(level, i, target->position);
+			if (target->type != NONE)
+				entity_walk(level, i, target->position);
 		}
 	}
 

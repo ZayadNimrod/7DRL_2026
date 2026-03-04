@@ -2,6 +2,7 @@
 #define LOGGER_C
 
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     unsigned max_log_len;
