@@ -145,7 +145,7 @@ enum ActionType {
 
 typedef struct {
 	enum ActionType type;
-	enum Direction direction;
+	Vector2Int target;
 } InputAction;
 
 typedef struct {
@@ -194,9 +194,19 @@ int entity_attack(Level* level, size_t attacker_id, size_t target_id) {
  * Returns 0 if the entity will walk when their impetus is enough
  * Returns -1 if the entity is blocked
  */
-int entity_walk(Level* level, size_t entity_id, enum Direction direction) {
+int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
 	Entity* entity = &level->entities[entity_id];
-	Vector2Int desired_position = vec2add(entity->position, from_direction(direction));
+
+	// Get the direction to walk - will be a vector with 1, 0 or -1 as the components:
+	Vector2Int dir;
+	if (target.x > entity->position.x) dir.x = 1;
+	else if (target.x < entity->position.x) dir.x = -1;
+	else dir.x = 0;
+	if (target.y > entity->position.y) dir.y = 1;
+	else if (target.y < entity->position.y) dir.y = -1;
+	else dir.y = 0;
+	Vector2Int desired_position = vec2add(entity->position, dir);
+
 	EntityIdList entities_there = entities_at_location(level, desired_position);
 	for (size_t i=0; i<entities_there.count; i++) {
 		size_t e_id = entities_there.entity_ids[i];
@@ -207,7 +217,7 @@ int entity_walk(Level* level, size_t entity_id, enum Direction direction) {
 			default:
 		}
 	}
-	if (direction != STILL && ++entity->impetus_to_move >= entity->inverse_speed) {
+	if (dir.x != 0 && dir.y != 0 && ++entity->impetus_to_move >= entity->inverse_speed) {
 		entity->impetus_to_move = 0;
 		entity->position = desired_position;
 		return 1;
@@ -222,14 +232,11 @@ int entity_walk(Level* level, size_t entity_id, enum Direction direction) {
  */
 int tick_level(Level* level, InputAction input) {
 	int get_more_input = 0;
-	enum Direction direction = input.direction;
 	switch (input.type) {
 		case WALK:
-			if (direction >= NORTH && direction <= NORTH_WEST) {
-				int has_moved = entity_walk(level, 0 /* player is entity 0 */, direction);
-				// Simluate more ticks unless we've finished moving:
-				if (!has_moved) get_more_input = 1;
-			}
+			int has_moved = entity_walk(level, 0 /* player is entity 0 */, input.target);
+			// Simluate more ticks unless we've finished moving:
+			if (!has_moved) get_more_input = 1;
 			break;
 		default:
 	}
