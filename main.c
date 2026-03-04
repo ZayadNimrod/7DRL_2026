@@ -10,14 +10,15 @@ typedef struct {
 
 display_t entity_char(Entity* entity)
 {
-
     switch (entity->type) {
     case NONE:
-        return (display_t) { .character = ' ', .attributes = A_NORMAL };
+        return (display_t) { .character = 0, .attributes = A_NORMAL };
     case PLAYER:
         return (display_t) { .character = '@', .attributes = A_BOLD };
     case WALL:
         return (display_t) { .character = '#', .attributes = A_NORMAL };
+    case ENEMY:
+        return (display_t) { .character = 'e', .attributes = A_NORMAL };        
     default:
         return (display_t) { .character = '?', .attributes = A_BLINK };
     }
@@ -33,10 +34,12 @@ void render_map(Level* world)
     for (unsigned i = 0; i < world->entity_count; i++) {
         Entity* e = &world->entities[i];
         display_t d = entity_char(e);
-        wattron(map_window, d.attributes);
-	Vector2Int position = e->position;
-        mvwaddch(map_window, position.x, position.y, d.character);
-        wattroff(map_window, d.attributes);
+        if (d.character!=0){
+            wattron(map_window, d.attributes);
+            Vector2Int position = e->position;
+            mvwaddch(map_window, position.y, position.x, d.character);
+            wattroff(map_window, d.attributes);
+        }
     }
 
     wrefresh(map_window);
@@ -99,21 +102,68 @@ int main()
     log_msg(&logger, "This is another log");
     log_msg(&logger, "Here is another log that is so long that it should go over multiple lines beep boop bap bop.");
 
+    InputAction last_action;
     while (true) {
         render(&level,&logger);
 
         char input = getch();
 
-        switch (input) {
-        case 'q':
-            return quit();
-		case '?':
-			log_msg(&logger, "TODO: Explain controls");
-			break;
+        Vector2Int player_position = level.entities[0].position;
 
-        default:
-            break;
+        switch (input) {
+            case 'q':
+                return quit();
+            case '?':
+                log_msg(&logger, "TODO: Explain controls");
+                continue;
+                break;
+            case 'h':
+            case '4':
+                last_action.type   = WALK;
+                last_action.target = vec2add(player_position,from_direction(WEST));
+                break;
+            case 'j':
+            case '2':
+                last_action.type   = WALK;
+                last_action.target = vec2add(player_position,from_direction(SOUTH));
+                break;
+            case 'l':
+            case '6':
+                last_action.type   = WALK;
+                last_action.target = vec2add(player_position,from_direction(EAST));
+                break;
+            case 'k':
+            case '8':
+                last_action.type   = WALK;
+                last_action.target = vec2add(player_position,from_direction(NORTH));
+                break;
+            case '7':
+                last_action.type   = WALK;
+                last_action.target = vec2add(player_position,from_direction(NORTH_WEST));
+                break;
+            case '9':
+                last_action.type   = WALK;
+                last_action.target = vec2add(player_position,from_direction(NORTH_EAST));
+                break;
+            case '3':
+                last_action.type   = WALK;
+                last_action.target = vec2add(player_position,from_direction(SOUTH_EAST));
+                break;
+            case '1':
+                last_action.type   = WALK;
+                last_action.target = vec2add(player_position,from_direction(SOUTH_WEST));
+                break;
+            case '5':
+            case '.':
+                last_action.type   = WAIT;
+                last_action.target = player_position;
+                break;
+            default:
+                continue;
+                break;
         }
+        
+        while(tick_level(&level,last_action)){}
     }
     return 0;
 }
