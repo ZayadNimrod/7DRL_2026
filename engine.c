@@ -6,7 +6,7 @@ enum EntityType {
 	NONE,
 	PLAYER,
 	WALL,
-	GOBLIN,
+	ENEMY,
 	TORCH,
 };
 
@@ -38,6 +38,8 @@ Vector2Int from_direction(enum Direction d) {
 typedef struct {
 	enum EntityType type;
 	Vector2Int position;
+	int hp;
+	int damage;
 	int inverse_speed;
 	int impetus_to_move; // When this hits inverse_speed, the player can move one tile.
 	int attack_delay;
@@ -61,6 +63,8 @@ Entity init_player() {
 	player.position = (Vector2Int){ LEVEL_WIDTH/2, LEVEL_HEIGHT/2 };
 	player.inverse_speed = 10;
 	player.attack_delay = 10;
+	player.hp = 10;
+	player.damage = 5;
 	return player;
 };
 
@@ -106,6 +110,13 @@ Level init_level(
 		add_wall(&level, LEVEL_WIDTH-1, y);
 	}
 
+	Entity* goblin = &level.entities[level.entity_count++];
+	goblin->type = ENEMY;
+	goblin->position = (Vector2Int){2, 2};
+	goblin->hp = 20;
+	goblin->damage = 2;
+
+
 	return level;
 };
 
@@ -113,7 +124,11 @@ void print_level(Level* level) {
 	char tiles[LEVEL_WIDTH][LEVEL_HEIGHT] = {0};
 	for (unsigned i=0; i<level->entity_count; i++) {
 		Entity* e = &level->entities[i];
-		tiles[e->position.x][e->position.y] = '.'; // TODO: maybe fix this
+		Vector2Int p = e->position;
+		if (p.x < 0 || p.y < 0 || p.x >= LEVEL_WIDTH || p.y >= LEVEL_HEIGHT) {
+		} else {
+			tiles[p.x][p.y] = '.'; // TODO: maybe fix this
+		}
 	}
 	for (int y=0; y<LEVEL_HEIGHT; y++) {
 		for (int x=0; x<LEVEL_WIDTH; x++) {
@@ -146,18 +161,29 @@ EntityIdList entities_at_location(Level* level, Vector2Int position) {
 		if (e->position.x == position.x && e->position.y == position.y) {
 			// NOTE! result.count can overflow if too many items are in the same place! 
 			// If it does, it will be funny :^)
-			result.entity_ids[result.count++] = i;
+			result.entity_ids[result.count] = i;
+			result.count++;
 		}
 	}
 	return result;
 }
 
-int collides(Level* level, Vector2Int position) {
-	EntityIdList entities_there = entities_at_location(level, position);
-	for (size_t i=0; i<entities_there.count; i++) {
-		Entity* e = &level->entities[i];
-		if (e->type == NONE) continue;
-		return 1;
+int deal_damage(Level* level, size_t target_id, int damage) {
+	Entity* target = &level->entities[target_id];
+	target->hp -= damage;
+	printf("Did %d damage to entity %ld\n", damage, target_id);
+	if (target->hp <= 0) {
+		target->type = NONE;
+		printf("entity %ld died\n", target_id);
+	}
+	return damage;
+}
+
+int entity_attack(Level* level, size_t attacker_id, size_t target_id) {
+	Entity* attacker = &level->entities[attacker_id];
+	if (++attacker->impetus_to_attack >= attacker->attack_delay) {
+		attacker->impetus_to_attack = 0;
+		return deal_damage(level, target_id, attacker->damage);
 	}
 	return 0;
 }
@@ -171,8 +197,15 @@ int collides(Level* level, Vector2Int position) {
 int entity_walk(Level* level, size_t entity_id, enum Direction direction) {
 	Entity* entity = &level->entities[entity_id];
 	Vector2Int desired_position = vec2add(entity->position, from_direction(direction));
-	if (collides(level, desired_position)) {
-		return -1;
+	EntityIdList entities_there = entities_at_location(level, desired_position);
+	for (size_t i=0; i<entities_there.count; i++) {
+		size_t e_id = entities_there.entity_ids[i];
+		Entity* e = &level->entities[e_id];
+		switch (e->type) {
+			case WALL: return -1;
+			case ENEMY: return entity_attack(level, entity_id, e_id);
+			default:
+		}
 	}
 	if (direction != STILL && ++entity->impetus_to_move >= entity->inverse_speed) {
 		entity->impetus_to_move = 0;
