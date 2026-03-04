@@ -217,7 +217,7 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
 			default:
 		}
 	}
-	if (dir.x != 0 && dir.y != 0 && ++entity->impetus_to_move >= entity->inverse_speed) {
+	if (++entity->impetus_to_move >= entity->inverse_speed && dir.x != 0 && dir.y != 0) {
 		entity->impetus_to_move = 0;
 		entity->position = desired_position;
 		return 1;
