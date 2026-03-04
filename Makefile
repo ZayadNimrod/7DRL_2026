@@ -3,7 +3,7 @@
 EXECUTABLE_PATH = bin/7drl
 
 CFLAGS_DEBUG	= 	-O0 -g $(CFLAGS_COMMON)
-CFLAGS_COMMON	= -MD -MP -Wall -Wextra -Werror
+CFLAGS_COMMON	= -MD -MP -Wall -Wextra -Werror -Wno-unused-variable -Wno-unused-but-set-variable
 CFLAGS_RELEASE	= -Os $(CFLAGS_COMMON) -DNDEBUG
 CLIBS	= -lncurses
 
