@@ -20,7 +20,8 @@ int main() {
 			case 'm': d = SOUTH_EAST; break;
 			default:
 		}
-		InputAction action = { WALK, d };
+		Vector2Int target = vec2add(level.entities[0].position, from_direction(d));
+		InputAction action = { WALK, target };
 		while (tick_level(&level, action)) { }
 	}
 	return 0;
