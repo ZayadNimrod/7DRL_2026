@@ -1,4 +1,5 @@
 #include "vector2int.h"
+#include <stdbool.h>
 
 enum EntityType {
 	NONE,
