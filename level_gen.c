@@ -1,5 +1,6 @@
 #include "ecs.c"
-#include <stdlib.h>
+#include "log.c"
+#include <stdbool.h>
 
 unsigned add_entity(Level* level, Entity entity)
 {
@@ -27,6 +28,92 @@ typedef struct {
     int right;
 } rect_t;
 
+typedef struct {
+    int cost;
+    bool individual;
+    int quantity; // ignore if individual
+    void (*function)(void); // pointer to a callback. Has different args depending on if this is an individual or stack item
+} cost_t;
+
+#define COSTS_LEN 8
+const cost_t cost_table[COSTS_LEN] = {
+    {
+        .cost = 2,
+        .individual = true,
+        .function = (void*)Goblin,
+    },
+    {
+        .cost = 1,
+        .individual = false,
+        .quantity = 3,
+        .function = (void*)Gold,
+    },
+    {
+        .cost = 3,
+        .individual = false,
+        .quantity = 10,
+        .function = (void*)Gold,
+    },
+    {
+        .cost = 5,
+        .individual = false,
+        .quantity = 18,
+        .function = (void*)Gold,
+    },
+    {
+        .cost = 5,
+        .individual = false,
+        .quantity = 2,
+        .function = (void*)Armor,
+    },
+    {
+        .cost = 5,
+        .individual = false,
+        .quantity = 1,
+        .function = (void*)Health,
+    },
+    {
+        .cost = 1,
+        .individual = false,
+        .quantity = 1,
+        .function = (void*)Arrows,
+    },
+    {
+        .cost = 2,
+        .individual = false,
+        .quantity = 3,
+        .function = (void*)Arrows,
+    }
+};
+
+void buy_in_budget(Level* level, int* budget, rect_t bounding_box)
+{
+    int idx = rand() % COSTS_LEN;
+    cost_t proposed = cost_table[idx];
+    if (proposed.cost > *budget)
+        return;
+    int x = rand() % (bounding_box.right - bounding_box.left) + bounding_box.left;
+    int y = rand() % (bounding_box.bottom - bounding_box.top) + bounding_box.top;
+    if (proposed.individual) {
+        *budget -= proposed.cost;
+        ((void (*)(Entity*, int, int))(proposed.function))(&level->entities[level->entity_count++], x, y);
+    } else {
+        int count = rand() % (*budget / proposed.cost) +1;
+        *budget -= proposed.cost * count;
+        ((void (*)(Entity*, int, int, int))(proposed.function))(&level->entities[level->entity_count++], x, y, count * proposed.quantity);
+    }
+}
+
+int ilog2(int i){
+    int o =0;
+    while (i){
+        o++;
+        i = i >>1;
+    }
+    return o-1;
+
+}
+
 void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char* tilemap, unsigned width, unsigned height)
 {
     if (remaining_depth == 0 || bounding_box.top - bounding_box.bottom < 4 || bounding_box.right - bounding_box.left < 4) {
@@ -36,16 +123,23 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char*
         unsigned y_start = bounding_box.bottom + 1;
         unsigned y_end = bounding_box.top - 1;
 
+        int max_budget = 0;
+
         // Carve out the room
         for (unsigned x = x_start; x <= x_end; x++) {
             for (unsigned y = y_start; y <= y_end; y++) {
                 tilemap[y * width + x] = 0;
+                max_budget++;
             }
         }
 
         // Place monsters in it
-
-        // TODO
+        max_budget *= (level->level_number+1);
+        max_budget = ilog2(max_budget);
+        int budget = rand() % max_budget;
+        while (budget) {
+            buy_in_budget(level, &budget, bounding_box);
+        }
 
     } else {
         // Bisect the bounding box
@@ -89,7 +183,7 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char*
         do {
             p2.y = rand() % (bb2.top - bb2.bottom) + bb2.bottom;
             p2.x = rand() % (bb2.right - bb2.left) + bb2.left;
-        }while (tilemap[p2.y * width + p2.x]);
+        } while (tilemap[p2.y * width + p2.x]);
 
         int x_begin = p1.x > p2.x ? p2.x : p1.x;
         int x_end = p1.x > p2.x ? p1.x : p2.x;

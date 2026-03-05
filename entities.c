@@ -1,3 +1,5 @@
+#ifndef ENTITIES_C
+#define ENTITIES_C
 #include "vector2int.h"
 #include <stdbool.h>
 
@@ -101,3 +103,4 @@ void Gold(Entity* e, int x, int y, int amount) {
 }
 
 
+#endif
