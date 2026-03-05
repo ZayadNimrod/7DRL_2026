@@ -48,6 +48,8 @@ typedef struct {
 	int impetus_to_attack; // When this hits attack_delay, the player can move one tile.
 	bool blocking; // Can you pathfind through this?
 	bool bumpable; // If you bump this, should you attack it?
+	int vision; // How many tiles away can this see?
+	int aggro_entity_id;
 } Entity; 
 
 #define MAX_ENTITIES 4096
@@ -130,6 +132,8 @@ Level init_level(
 	goblin->damage = 2;
 	goblin->blocking = 1;
 	goblin->bumpable = 1;
+	goblin->inverse_speed = 5;
+	goblin->attack_delay = 2;
 
 
 	return level;
@@ -239,10 +243,10 @@ EntityIdList entities_at_location(Level* level, Vector2Int position) {
 int deal_damage(Level* level, size_t target_id, int damage) {
 	Entity* target = &level->entities[target_id];
 	target->hp -= damage;
-	// TODO: log_msg("Did %d damage to entity %ld\n", damage, target_id);
+	printf("Did %d damage to entity %ld\n", damage, target_id);
 	if (target->hp <= 0) {
 		target->type = NONE;
-		// TODO: log_msg("entity %ld died\n", target_id);
+		printf("entity %ld died\n", target_id);
 	}
 	return damage;
 }
@@ -267,12 +271,6 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
 	if (entity->inverse_speed == 0) return -1;
 
 	PathfindingResult path = pathfind(level, target);
-		for (int y=0; y<LEVEL_HEIGHT; y++) {
-			for (int x=0; x<LEVEL_WIDTH; x++) {
-				printf("%c", path.distance[x][y] + '0');
-			}
-			printf("\n");
-		}
 	Vector2Int p = entity->position;
 	int current_dist = path.distance[p.x][p.y];
 	Vector2Int dir = {0};
@@ -322,8 +320,19 @@ int tick_level(Level* level, InputAction input) {
 			// Simluate more ticks unless we've finished moving:
 			if (!has_moved) get_more_input = 1;
 			break;
+		case ATTACK: // TODO:
+		case WAIT:
 		default:
 	}
+
+	for (size_t i=0; i<level->entity_count; i++) {
+		Entity* e = &level->entities[i];
+		if (e->aggro_entity_id >= 0) {
+			Entity* target = &level->entities[e->aggro_entity_id];
+			if (target->type != NONE) entity_walk(level, i, target->position);
+		}
+	}
+
 	return get_more_input;
 }
 
