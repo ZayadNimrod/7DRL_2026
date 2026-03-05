@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include "log.c"
 
 
@@ -45,6 +46,8 @@ typedef struct {
 	int impetus_to_move; // When this hits inverse_speed, the player can move one tile.
 	int attack_delay;
 	int impetus_to_attack; // When this hits attack_delay, the player can move one tile.
+	bool blocking; // Can you pathfind through this?
+	bool bumpable; // If you bump this, should you attack it?
 } Entity; 
 
 #define MAX_ENTITIES 4096
@@ -72,6 +75,8 @@ Entity init_player() {
 	player.attack_delay = 10;
 	player.hp = 10;
 	player.damage = 5;
+	player.blocking = 1;
+	player.bumpable = 1;
 	return player;
 };
 
@@ -89,6 +94,7 @@ unsigned add_wall(Level* level, int x, int y) {
 	Entity wall = {0};
 	wall.type = WALL;
 	wall.position = (Vector2Int){ x, y };
+	wall.blocking = 1;
 	return add_entity(level, wall);
 }
 
@@ -122,6 +128,8 @@ Level init_level(
 	goblin->position = (Vector2Int){2, 2};
 	goblin->hp = 20;
 	goblin->damage = 2;
+	goblin->blocking = 1;
+	goblin->bumpable = 1;
 
 
 	return level;
@@ -144,6 +152,64 @@ void print_level(Level* level) {
 		}
 		printf("\n");
 	}
+}
+
+typedef struct {
+	int distance[LEVEL_WIDTH][LEVEL_HEIGHT];
+	Vector2Int target;
+} PathfindingResult;
+
+/**
+ * Uses depth-first search to find the shortest distance to target from any point in the level
+ * You should run make_lookup(&level) before calling this function to update the reverse tile lookup
+ */
+PathfindingResult pathfind(Level* level, Vector2Int target) {
+	PathfindingResult result = {0};
+	result.target = target;
+	Vector2Int queue[4096];
+	int queue_distance[4096];
+	int front = 0;
+	int back = 0;
+	queue[back++] = target;
+	queue_distance[back] = 0;
+
+	while (front < back) {
+		Vector2Int p = queue[front++];
+		int distance = queue_distance[front];
+		if (result.distance[p.x][p.y] != 0) continue;
+		// If it's a wall, eat it
+		EntityIdList* es = &level->by_tile[p.x][p.y];
+		int blocked = 0;
+		for (size_t i=0; i<es->count; i++) {
+			size_t e_id = es->entity_ids[i];
+			Entity* e = &level->entities[e_id];
+			if (e->blocking) blocked = 1;
+		}
+		if (target.x == p.x && target.y == p.y) {
+			blocked = 0;
+			result.distance[p.x][p.y] = 0;
+		}
+		if (blocked) {
+			result.distance[p.x][p.y] = 255;
+		} else {
+			result.distance[p.x][p.y] = distance;
+			for (int x=p.x-1; x<=p.x+1; x++) {
+				for (int y=p.y-1; y<=p.y+1; y++) {
+					if (x < 0) continue;
+					if (y < 0) continue;
+					if (x >= LEVEL_WIDTH) continue;
+					if (y >= LEVEL_HEIGHT) continue;
+					if (x == p.x && y == p.y) continue;
+					if (result.distance[x][y] == 0) {
+						queue[back++] = (Vector2Int){x,y};
+						queue_distance[back] = distance + 1;
+					}
+				}
+			}
+		}
+	}
+	result.distance[target.x][target.y] = 0;
+	return result;
 }
 
 enum ActionType {
@@ -198,26 +264,41 @@ int entity_attack(Level* level, size_t attacker_id, size_t target_id) {
  */
 int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
 	Entity* entity = &level->entities[entity_id];
+	if (entity->inverse_speed == 0) return -1;
 
-	// Get the direction to walk - will be a vector with 1, 0 or -1 as the components:
-	Vector2Int dir;
-	if (target.x > entity->position.x) dir.x = 1;
-	else if (target.x < entity->position.x) dir.x = -1;
-	else dir.x = 0;
-	if (target.y > entity->position.y) dir.y = 1;
-	else if (target.y < entity->position.y) dir.y = -1;
-	else dir.y = 0;
+	PathfindingResult path = pathfind(level, target);
+		for (int y=0; y<LEVEL_HEIGHT; y++) {
+			for (int x=0; x<LEVEL_WIDTH; x++) {
+				printf("%c", path.distance[x][y] + '0');
+			}
+			printf("\n");
+		}
+	Vector2Int p = entity->position;
+	int current_dist = path.distance[p.x][p.y];
+	Vector2Int dir = {0};
+	for (int x=p.x-1; x<=p.x+1; x++) {
+		for (int y=p.y-1; y<=p.y+1; y++) {
+			if (x < 0) continue;
+			if (y < 0) continue;
+			if (x >= LEVEL_WIDTH) continue;
+			if (y >= LEVEL_HEIGHT) continue;
+			if (x == p.x && y == p.y) continue;
+			if (path.distance[x][y] < current_dist) {
+				dir.x = x-p.x;
+				dir.y = y-p.y;
+				current_dist = path.distance[x][y];
+			}
+		}
+	}
+	if (dir.x == 0 && dir.y == 0) return -1;
 	Vector2Int desired_position = vec2add(entity->position, dir);
 
 	EntityIdList entities_there = entities_at_location(level, desired_position);
 	for (size_t i=0; i<entities_there.count; i++) {
 		size_t e_id = entities_there.entity_ids[i];
 		Entity* e = &level->entities[e_id];
-		switch (e->type) {
-			case WALL: return -1;
-			case ENEMY: return entity_attack(level, entity_id, e_id);
-			default:
-		}
+		if (e->bumpable) return entity_attack(level, entity_id, e_id);
+		if (e->blocking) return -1;
 	}
 	entity->impetus_to_move++;
 	if (entity->impetus_to_move >= entity->inverse_speed) {
@@ -253,62 +334,4 @@ void make_lookup(Level* level) {
 			level->by_tile[x][y] = entities_at_location(level, (Vector2Int){x,y});
 		}
 	}
-}
-
-typedef struct {
-	int distance[LEVEL_WIDTH][LEVEL_HEIGHT];
-	Vector2Int target;
-} PathfindingResult;
-
-/**
- * Uses depth-first search to find the shortest distance to target from any point in the level
- * You should run make_lookup(&level) before calling this function to update the reverse tile lookup
- */
-PathfindingResult pathfind(Level* level, Vector2Int target) {
-	PathfindingResult result = {0};
-	result.target = target;
-	Vector2Int queue[4096];
-	int queue_distance[4096];
-	int front = 0;
-	int back = 0;
-	queue[back++] = target;
-	queue_distance[back] = 0;
-
-	while (front < back) {
-		Vector2Int p = queue[front++];
-		int distance = queue_distance[front];
-		if (result.distance[p.x][p.y] != 0) continue;
-		// If it's a wall, eat it
-		EntityIdList* es = &level->by_tile[p.x][p.y];
-		int blocked = 0;
-		for (size_t i=0; i<es->count; i++) {
-			size_t e_id = es->entity_ids[i];
-			Entity* e = &level->entities[e_id];
-			switch (e->type) {
-				case WALL:
-				case ENEMY: 
-					blocked = 1;
-				default:
-			}
-		}
-		if (blocked) {
-			result.distance[p.x][p.y] = 255;
-		} else {
-			result.distance[p.x][p.y] = distance;
-			for (int x=p.x-1; x<=p.x+1; x++) {
-				for (int y=p.y-1; y<=p.y+1; y++) {
-					if (x < 0) continue;
-					if (y < 0) continue;
-					if (x > LEVEL_WIDTH) continue;
-					if (y > LEVEL_HEIGHT) continue;
-					if (x == p.x && y == p.y) continue;
-					if (result.distance[x][y] == 0) {
-						queue[back++] = (Vector2Int){x,y};
-						queue_distance[back] = distance + 1;
-					}
-				}
-			}
-		}
-	}
-	return result;
 }
