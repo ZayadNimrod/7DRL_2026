@@ -66,6 +66,7 @@ typedef struct {
 	unsigned entity_count;
 	int level_number;
 	EntityIdList by_tile[LEVEL_WIDTH][LEVEL_HEIGHT];
+	logger_t* logger;
 } Level;
 // Entity #0 is always the player
 
@@ -102,9 +103,11 @@ unsigned add_wall(Level* level, int x, int y) {
 
 Level init_level(
 	int level_number, 
-	Level* prev_level
+	Level* prev_level,
+	logger_t* logger
 ) {
 	Level level = {0};
+	level.logger = logger;
 	level.level_number = level_number;
 	if (prev_level->entities[0].type != PLAYER) {
 		// Create a new player
@@ -240,13 +243,16 @@ EntityIdList entities_at_location(Level* level, Vector2Int position) {
 	return result;
 }
 
+char log_buf[1024];
 int deal_damage(Level* level, size_t target_id, int damage) {
 	Entity* target = &level->entities[target_id];
 	target->hp -= damage;
-	printf("Did %d damage to entity %ld\n", damage, target_id);
+	sprintf(log_buf, "Did %d damage to entity %ld\n", damage, target_id);
+	log_msg(level->logger, log_buf);
 	if (target->hp <= 0) {
 		target->type = NONE;
-		printf("entity %ld died\n", target_id);
+		sprintf(log_buf, "entity %ld died\n", target_id);
+		log_msg(level->logger, log_buf);
 	}
 	return damage;
 }

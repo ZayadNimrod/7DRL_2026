@@ -87,6 +87,9 @@ int quit()
 
 int main()
 {
+    const int MAX_LOGS = LEVEL_HEIGHT / 2;
+    const int MAX_LOG_LEN = 120 - LEVEL_WIDTH;
+    logger_t logger = *init_logger(MAX_LOGS, MAX_LOG_LEN);
 
     initscr();
     curs_set(0); // hide cursor
@@ -95,16 +98,12 @@ int main()
 	refresh();
 
     Level level = { 0 };
-    level = init_level(0, &level);
-
-    const int MAX_LOGS = LEVEL_HEIGHT / 2;
-    const int MAX_LOG_LEN = 120 - LEVEL_WIDTH;
+    level = init_level(0, &level, &logger);
 
     map_window = newwin(LEVEL_HEIGHT, LEVEL_WIDTH, 0, 0);
     log_window = newwin(MAX_LOGS, MAX_LOG_LEN, LEVEL_HEIGHT - MAX_LOGS, LEVEL_WIDTH);
     stat_window = newwin(LEVEL_HEIGHT-MAX_LOGS-1, MAX_LOG_LEN, 0, LEVEL_WIDTH);
 
-    logger_t logger = init_logger(MAX_LOGS, MAX_LOG_LEN);
 
     log_msg(&logger, "This is a log");
     log_msg(&logger, "This is another log");

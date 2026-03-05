@@ -14,17 +14,19 @@ typedef struct {
 
 // TODO a way to reset the logger/free its members
 
-logger_t init_logger(unsigned max_logs, unsigned max_log_len)
+logger_t* init_logger(unsigned max_logs, unsigned max_log_len)
 {
     char** logs = malloc(sizeof(char*) * max_logs);
+    logger_t* retval = malloc(sizeof(logger_t));
 
-    return (logger_t) {
+    *retval = (logger_t) {
         .max_log_len = max_log_len,
         .max_logs = max_logs,
         .total_logs = 0,
         .idx = 0,
         .logs = logs
     };
+    return retval;
 }
 
 void append_log(logger_t* logger, char* log, unsigned log_len)
@@ -82,4 +84,5 @@ void log_msg(logger_t* logger, char* format)
         append_log(logger, buf, buf_idx);
     }
 }
+
 #endif
