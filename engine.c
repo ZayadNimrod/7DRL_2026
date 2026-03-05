@@ -137,15 +137,13 @@ void print_level(Level* level) {
 			tiles[p.x][p.y] = '.'; // TODO: maybe fix this
 		}
 	}
-	/*
 	for (int y=0; y<LEVEL_HEIGHT; y++) {
 		for (int x=0; x<LEVEL_WIDTH; x++) {
 			char c = tiles[x][y];
-			// TODO: log_msg("%c", c ? c : ' ');
+			printf("%c", c ? c : ' ');
 		}
-		// TODO: log_msg("\n");
+		printf("\n");
 	}
-	*/
 }
 
 enum ActionType {
@@ -262,47 +260,55 @@ typedef struct {
 	Vector2Int target;
 } PathfindingResult;
 
-void _pathfind(Level* level, PathfindingResult* result, Vector2Int p, int distance) {
-	if (p.x < 0) return;
-	if (p.y < 0) return;
-	if (p.x > LEVEL_WIDTH) return;
-	if (p.y < LEVEL_HEIGHT) return;
-	result->distance[p.x][p.y] = distance;
-	if (distance < 0) return;
-	for (int x=p.x-1; x<=p.x+1; x++) {
-		for (int y=p.y-1; y<=p.y+1; y++) {
-			if (x < 0) continue;
-			if (y < 0) continue;
-			if (x > LEVEL_WIDTH) continue;
-			if (y < LEVEL_HEIGHT) continue;
-			if (x == result->target.x && y == result->target.y) continue;
-			if (result->distance[x][y] > distance) continue;
-			Vector2Int loc = {x,y};
-			EntityIdList* es = &level->by_tile[x][y];
-			int blocked = 0;
-			for (size_t i=0; i<es->count; i++) {
-				size_t e_id = es->entity_ids[i];
-				Entity* e = &level->entities[e_id];
-				switch (e->type) {
-					case WALL:
-					case ENEMY: 
-						blocked = 1;
-					default:
-				}
-			}
-			if (blocked) _pathfind(level, result, loc, -1);
-			else _pathfind(level, result, loc, distance+1);
-		}
-	}
-}
-
 /**
  * Uses depth-first search to find the shortest distance to target from any point in the level
+ * You should run make_lookup(&level) before calling this function to update the reverse tile lookup
  */
 PathfindingResult pathfind(Level* level, Vector2Int target) {
 	PathfindingResult result = {0};
 	result.target = target;
-	_pathfind(level, &result, target, 0);
+	Vector2Int queue[4096];
+	int queue_distance[4096];
+	int front = 0;
+	int back = 0;
+	queue[back++] = target;
+	queue_distance[back] = 0;
+
+	while (front < back) {
+		Vector2Int p = queue[front++];
+		int distance = queue_distance[front];
+		if (result.distance[p.x][p.y] != 0) continue;
+		// If it's a wall, eat it
+		EntityIdList* es = &level->by_tile[p.x][p.y];
+		int blocked = 0;
+		for (size_t i=0; i<es->count; i++) {
+			size_t e_id = es->entity_ids[i];
+			Entity* e = &level->entities[e_id];
+			switch (e->type) {
+				case WALL:
+				case ENEMY: 
+					blocked = 1;
+				default:
+			}
+		}
+		if (blocked) {
+			result.distance[p.x][p.y] = 255;
+		} else {
+			result.distance[p.x][p.y] = distance;
+			for (int x=p.x-1; x<=p.x+1; x++) {
+				for (int y=p.y-1; y<=p.y+1; y++) {
+					if (x < 0) continue;
+					if (y < 0) continue;
+					if (x > LEVEL_WIDTH) continue;
+					if (y > LEVEL_HEIGHT) continue;
+					if (x == p.x && y == p.y) continue;
+					if (result.distance[x][y] == 0) {
+						queue[back++] = (Vector2Int){x,y};
+						queue_distance[back] = distance + 1;
+					}
+				}
+			}
+		}
+	}
 	return result;
 }
-
