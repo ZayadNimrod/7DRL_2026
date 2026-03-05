@@ -1,14 +1,15 @@
-#include "entities.c"
+
 #include "log.c"
 #include "vector2int.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-char log_buf[1024];
 
 #include "ecs.c"
 #include "level_gen.c"
+
+char log_buf[1024];
 
 Entity init_player()
 {
