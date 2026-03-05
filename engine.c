@@ -191,6 +191,7 @@ int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage) 
 
 int entity_attack(Level* level, size_t attacker_id, size_t target_id) {
 	Entity* attacker = &level->entities[attacker_id];
+	if (attacker->type == NONE) return -1;
 	if (++attacker->impetus_to_attack >= attacker->attack_delay) {
 		attacker->impetus_to_attack = 0;
 		return deal_damage(level, attacker_id, target_id, attacker->damage);
@@ -206,6 +207,7 @@ int entity_attack(Level* level, size_t attacker_id, size_t target_id) {
  */
 int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
 	Entity* entity = &level->entities[entity_id];
+	if (entity->type == NONE) return -1;
 	if (entity->inverse_speed == 0) return -1;
 
 	PathfindingResult path = pathfind(level, target);
