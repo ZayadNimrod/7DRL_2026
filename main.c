@@ -46,6 +46,7 @@ void render_map(Level* world)
 			Vector2Int position = e->position;
 			mvwaddch(map_window, position.y, position.x, d.character);
 			wattroff(map_window, d.attributes);
+			wattron(map_window, COLOR_PAIR(0));
 		}
 	}
 
@@ -92,9 +93,8 @@ int main()
 	const int MAX_LOG_LEN = 80 - LEVEL_WIDTH;
 	logger_t logger = *init_logger(MAX_LOGS, MAX_LOG_LEN);
 
-	//srand(time(0));
+	// srand(time(0));
 	srand(0);
-
 
 	initscr();
 	start_color();
