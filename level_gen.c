@@ -150,8 +150,9 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char*
         if (split_direction) {
             int top = bounding_box.top;
             int bottom = bounding_box.bottom;
-            unsigned halfrange = (top - bottom) / 2;
-            unsigned split_point = rand() % halfrange + halfrange / 2 + bottom;
+            //unsigned halfrange = (top - bottom) / 2;
+            //unsigned split_point = rand() % halfrange + halfrange / 2 + bottom;
+            unsigned split_point = (top+bottom)/2;
             bb1.top = top;
             bb1.bottom = split_point;
             bb2.top = split_point;
@@ -160,8 +161,9 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char*
         } else {
             int right = bounding_box.right;
             int left = bounding_box.left;
-            unsigned halfrange = (right - left) / 2;
-            unsigned split_point = rand() % halfrange + halfrange / 2 + left;
+            //unsigned halfrange = (right - left) / 2;
+            //unsigned split_point = rand() % halfrange + halfrange / 2 + left;
+            unsigned split_point = (right+left)/2;
             bb1.left = left;
             bb1.right = split_point;
             bb2.left = split_point;
