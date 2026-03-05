@@ -242,6 +242,18 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
 	if (entity->impetus_to_move >= entity->inverse_speed) {
 		entity->impetus_to_move = 0;
 		entity->position = desired_position;
+		for (size_t i=0; i<entities_there.count; i++) {
+			size_t e_id = entities_there.entity_ids[i];
+			Entity* e = &level->entities[e_id];
+			if (e->type == ITEM) {
+				// TODO: log this information
+				if (e->hp) entity->hp += e->hp;
+				if (e->armor) entity->armor += e->armor;
+				if (e->arrows) entity->arrows += e->arrows;
+				if (e->gold) entity->gold += e->gold;
+				e->type = NONE;
+			}
+		}
 		return 1;
 	}
 	return 0;

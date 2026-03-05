@@ -5,14 +5,13 @@ enum EntityType {
 	PLAYER,
 	WALL,
 	ENEMY,
-	TORCH,
+	ITEM,
 };
 
 typedef struct {
 	char* name;
 	enum EntityType type;
 	Vector2Int position;
-	int hp;
 	int damage;
 	int inverse_speed;
 	int impetus_to_move; // When this hits inverse_speed, the player can move one tile->
@@ -22,9 +21,15 @@ typedef struct {
 	bool bumpable; // If you bump this, should you attack it?
 	int vision; // How many tiles away can this see?
 	int aggro_entity_id;
+	// These are things you can have in an inventory.
+	// If this is an item, picking it up will add those things to your inventory.
+	int hp;
+	int arrows;
+	int armor;
+	int gold;
 } Entity; 
 
-// The following functions are helper functions for creating entities:
+// The following functions are helper functions for instantiating entities:
 
 void Position(Entity* e, int x, int y) {
 	e->position.x = x;
@@ -62,6 +67,36 @@ void Goblin(Entity* e, int x, int y) {
 	e->name = "Goblin";
 	e->type = ENEMY;
 	Position(e, x, y);
-	Combat(e, 15, 2, 6);
+	Combat(e, 15, 1, 15);
 	Movement(e, 12);
 }
+
+void Arrows(Entity* e, int x, int y, int amount) {
+	e->name = "Bundle of arrows";
+	e->type = ITEM;
+	Position(e, x, y);
+	e->arrows = amount;
+}
+
+void Armor(Entity* e, int x, int y, int amount) {
+	e->name = "Armor Shard";
+	e->type = ITEM;
+	Position(e, x, y);
+	e->armor = amount;
+}
+
+void Health(Entity* e, int x, int y, int amount) {
+	e->name = "Health Potion";
+	e->type = ITEM;
+	Position(e, x, y);
+	e->hp = amount;
+}
+
+void Gold(Entity* e, int x, int y, int amount) {
+	e->name = "Bag of gold";
+	e->type = ITEM;
+	Position(e, x, y);
+	e->gold = amount;
+}
+
+
