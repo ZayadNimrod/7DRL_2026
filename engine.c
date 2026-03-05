@@ -5,6 +5,7 @@
 #include "entities.c"
 #include "vector2int.h"
 
+char log_buf[1024];
 
 enum Direction { STILL, NORTH, NORTH_EAST, EAST, SOUTH_EAST, SOUTH, SOUTH_WEST, WEST, NORTH_WEST };
 
@@ -25,8 +26,8 @@ Vector2Int from_direction(enum Direction d) {
 }
 
 #define MAX_ENTITIES 4096
-#define LEVEL_WIDTH 15
-#define LEVEL_HEIGHT 9
+#define LEVEL_WIDTH 60
+#define LEVEL_HEIGHT 30
 
 typedef struct {
 	size_t entity_ids[32];
@@ -71,6 +72,12 @@ Level init_level(
 
 	Goblin(&level.entities[level.entity_count++], 2, 2);
 
+	// Spawn some items
+	Health(&level.entities[level.entity_count++], 5, 5, 10);
+	Gold(&level.entities[level.entity_count++], 8, 10, 10);
+	Armor(&level.entities[level.entity_count++], 15, 15, 10);
+	Arrows(&level.entities[level.entity_count++], 20, 20, 10);
+
 	return level;
 };
 
@@ -105,8 +112,8 @@ typedef struct {
 PathfindingResult pathfind(Level* level, Vector2Int target) {
 	PathfindingResult result = {0};
 	result.target = target;
-	Vector2Int queue[4096];
-	int queue_distance[4096];
+	Vector2Int queue[1<<18];
+	int queue_distance[1<<18];
 	int front = 0;
 	int back = 0;
 	queue[back++] = target;
@@ -115,7 +122,7 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 	while (front < back) {
 		Vector2Int p = queue[front++];
 		int distance = queue_distance[front];
-		if (result.distance[p.x][p.y] != 0) continue;
+		if (result.distance[p.x][p.y] != 0 && result.distance[p.x][p.y] < distance) continue;
 		// If it's a wall, eat it
 		EntityIdList* es = &level->by_tile[p.x][p.y];
 		int blocked = 0;
@@ -139,9 +146,10 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 					if (x >= LEVEL_WIDTH) continue;
 					if (y >= LEVEL_HEIGHT) continue;
 					if (x == p.x && y == p.y) continue;
-					if (result.distance[x][y] == 0) {
+					if (result.distance[x][y] > distance || result.distance[x][y] == 0) {
 						queue[back++] = (Vector2Int){x,y};
 						queue_distance[back] = distance + 1;
+						result.distance[x][y] = distance + 1;
 					}
 				}
 			}
@@ -174,7 +182,15 @@ EntityIdList entities_at_location(Level* level, Vector2Int position) {
 	return result;
 }
 
-char log_buf[1024];
+void make_lookup(Level* level) {
+	// Level Generation
+	for (int x=0; x<LEVEL_WIDTH; x++) {
+		for (int y=0; y<LEVEL_HEIGHT; y++) {
+			level->by_tile[x][y] = entities_at_location(level, (Vector2Int){x,y});
+		}
+	}
+}
+
 int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage) {
 	Entity* attacker = &level->entities[attacker_id];
 	Entity* target = &level->entities[target_id];
@@ -246,13 +262,15 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target) {
 			size_t e_id = entities_there.entity_ids[i];
 			Entity* e = &level->entities[e_id];
 			if (e->type == ITEM) {
-				// TODO: log this information
+				sprintf(log_buf, "Picked up %s", e->name);
+				log_msg(level->logger, log_buf);
 				if (e->hp) entity->hp += e->hp;
 				if (e->armor) entity->armor += e->armor;
 				if (e->arrows) entity->arrows += e->arrows;
 				if (e->gold) entity->gold += e->gold;
 				e->type = NONE;
 			}
+			make_lookup(level);
 		}
 		return 1;
 	}
@@ -286,13 +304,4 @@ int tick_level(Level* level, InputAction input) {
 	}
 
 	return get_more_input;
-}
-
-void make_lookup(Level* level) {
-	// Level Generation
-	for (int x=0; x<LEVEL_WIDTH; x++) {
-		for (int y=0; y<LEVEL_HEIGHT; y++) {
-			level->by_tile[x][y] = entities_at_location(level, (Vector2Int){x,y});
-		}
-	}
 }
