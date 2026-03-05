@@ -72,28 +72,28 @@ void Goblin(Entity* e, int x, int y) {
 }
 
 void Arrows(Entity* e, int x, int y, int amount) {
-	e->name = "Bundle of arrows";
+	e->name = "a bundle of arrows";
 	e->type = ITEM;
 	Position(e, x, y);
 	e->arrows = amount;
 }
 
 void Armor(Entity* e, int x, int y, int amount) {
-	e->name = "Armor Shard";
+	e->name = "an armor shard";
 	e->type = ITEM;
 	Position(e, x, y);
 	e->armor = amount;
 }
 
 void Health(Entity* e, int x, int y, int amount) {
-	e->name = "Health Potion";
+	e->name = "a health potion";
 	e->type = ITEM;
 	Position(e, x, y);
 	e->hp = amount;
 }
 
 void Gold(Entity* e, int x, int y, int amount) {
-	e->name = "Bag of gold";
+	e->name = "a bag of gold";
 	e->type = ITEM;
 	Position(e, x, y);
 	e->gold = amount;
