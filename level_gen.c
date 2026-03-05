@@ -27,14 +27,14 @@ typedef struct {
     int right;
 } rect_t;
 
-void bsp_iter(Level* level, unsigned remaining_depth, rect_t* bounding_box, char* tilemap, unsigned width, unsigned height)
+void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char* tilemap, unsigned width, unsigned height)
 {
-    if (remaining_depth == 0 || bounding_box->top - bounding_box->bottom < 4 || bounding_box->right - bounding_box->left < 4) {
+    if (remaining_depth == 0 || bounding_box.top - bounding_box.bottom < 4 || bounding_box.right - bounding_box.left < 4) {
         // TODO perturb these
-        unsigned x_start = bounding_box->left + 1;
-        unsigned x_end = bounding_box->right - 1;
-        unsigned y_start = bounding_box->bottom + 1;
-        unsigned y_end = bounding_box->top - 1;
+        unsigned x_start = bounding_box.left + 1;
+        unsigned x_end = bounding_box.right - 1;
+        unsigned y_start = bounding_box.bottom + 1;
+        unsigned y_end = bounding_box.top - 1;
 
         // Carve out the room
         for (unsigned x = x_start; x <= x_end; x++) {
@@ -49,13 +49,13 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t* bounding_box, char
 
     } else {
         // Bisect the bounding box
-        rect_t bb1 = *bounding_box;
-        rect_t bb2 = *bounding_box;
+        rect_t bb1 = bounding_box;
+        rect_t bb2 = bounding_box;
 
         unsigned split_direction = rand() % 2;
         if (split_direction) {
-            int top = bounding_box->top;
-            int bottom = bounding_box->bottom;
+            int top = bounding_box.top;
+            int bottom = bounding_box.bottom;
             unsigned halfrange = (top - bottom) / 2;
             unsigned split_point = rand() % halfrange + halfrange / 2 + bottom;
             bb1.top = top;
@@ -64,8 +64,8 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t* bounding_box, char
             bb2.bottom = bottom;
 
         } else {
-            int right = bounding_box->right;
-            int left = bounding_box->left;
+            int right = bounding_box.right;
+            int left = bounding_box.left;
             unsigned halfrange = (right - left) / 2;
             unsigned split_point = rand() % halfrange + halfrange / 2 + left;
             bb1.left = left;
@@ -75,27 +75,46 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t* bounding_box, char
         }
 
         // Build the sub-partitions
-        bsp_iter(level, remaining_depth - 1, &bb1, tilemap, width, height);
-        bsp_iter(level, remaining_depth - 1, &bb2, tilemap, width, height);
+        bsp_iter(level, remaining_depth - 1, bb1, tilemap, width, height);
+        bsp_iter(level, remaining_depth - 1, bb2, tilemap, width, height);
 
         // Join the sub-partitions
+        
         Vector2Int p1, p2;
+        do {
+            p1.y = rand() % (bb1.top - bb1.bottom) + bb1.bottom;
+            p1.x = rand() % (bb1.right - bb1.left) + bb1.left;
+        } while (tilemap[p1.y * width + p1.x]);
 
-        // TODO
+        do {
+            p2.y = rand() % (bb2.top - bb2.bottom) + bb2.bottom;
+            p2.x = rand() % (bb2.right - bb2.left) + bb2.left;
+        }while (tilemap[p2.y * width + p2.x]);
+
+        int x_begin = p1.x > p2.x ? p2.x : p1.x;
+        int x_end = p1.x > p2.x ? p1.x : p2.x;
+
+        int y_begin = p1.y > p2.y ? p2.y : p1.y;
+        int y_end = p1.y > p2.y ? p1.y : p2.y;
+
+        unsigned join_direction = rand() % 2;
+        for (int x = x_begin; x <= x_end; x++) {
+            tilemap[y_begin * width + x] = 0;
+        }
+        for (int y = y_begin; y <= y_end; y++) {
+            tilemap[y * width + x_end] = 0;
+        }
     }
 }
 
-void bsp_dungeon(Level* level)
+void bsp_dungeon(Level* level, int width, int height)
 {
-
-    int width = LEVEL_WIDTH;
-    int height = LEVEL_HEIGHT;
     // Call bsp_iter on the top level
-    char tilemap[width * height];
+    char* tilemap = malloc(sizeof(char) * width * height);
     for (int i = 0; i < width * height; i++) {
         tilemap[i] = 1;
     }
-    bsp_iter(level, 4, &(rect_t) { 0, height - 1, 0, width - 1 }, tilemap, width, height);
+    bsp_iter(level, 3, (rect_t) { .bottom = 0, .top = height - 1, .left = 0, .right = width - 1 }, tilemap, width, height);
 
     // For every filled cell in the output tilemap, place a wall.
     for (int x = 0; x < width; x++) {
@@ -105,24 +124,10 @@ void bsp_dungeon(Level* level)
             }
         }
     }
+    free(tilemap);
 }
 
 void generate_level(Level* level)
 {
-
-    // Level Generation
-    for (int x = 1; x < LEVEL_WIDTH - 1; x++) {
-        add_wall(level, x, 0);
-        add_wall(level, x, LEVEL_HEIGHT - 1);
-    }
-    for (int y = 1; y < LEVEL_HEIGHT - 1; y++) {
-        add_wall(level, 0, y);
-        add_wall(level, LEVEL_WIDTH - 1, y);
-    }
-
-    Entity* goblin = &(level->entities[level->entity_count++]);
-    goblin->type = ENEMY;
-    goblin->position = (Vector2Int) { 2, 2 };
-    goblin->hp = 20;
-    goblin->damage = 2;
+    bsp_dungeon(level, LEVEL_WIDTH, LEVEL_HEIGHT);
 }
