@@ -2,24 +2,11 @@
 #include <string.h>
 #include <stdint.h>
 #include "log.c"
+#include "entities.c"
+#include "vector2int.h"
 
-
-enum EntityType {
-	NONE,
-	PLAYER,
-	WALL,
-	ENEMY,
-	TORCH,
-};
 
 enum Direction { STILL, NORTH, NORTH_EAST, EAST, SOUTH_EAST, SOUTH, SOUTH_WEST, WEST, NORTH_WEST };
-
-typedef struct {
-	int x;
-	int y;
-} Vector2Int;
-
-Vector2Int vec2add(Vector2Int a, Vector2Int b) { Vector2Int result = { a.x + b.x, a.y + b.y }; return result; }
 
 Vector2Int from_direction(enum Direction d) {
 	Vector2Int result;
@@ -37,21 +24,6 @@ Vector2Int from_direction(enum Direction d) {
 	return result;
 }
 
-typedef struct {
-	enum EntityType type;
-	Vector2Int position;
-	int hp;
-	int damage;
-	int inverse_speed;
-	int impetus_to_move; // When this hits inverse_speed, the player can move one tile.
-	int attack_delay;
-	int impetus_to_attack; // When this hits attack_delay, the player can move one tile.
-	bool blocking; // Can you pathfind through this?
-	bool bumpable; // If you bump this, should you attack it?
-	int vision; // How many tiles away can this see?
-	int aggro_entity_id;
-} Entity; 
-
 #define MAX_ENTITIES 4096
 #define LEVEL_WIDTH 15
 #define LEVEL_HEIGHT 9
@@ -68,38 +40,6 @@ typedef struct {
 	EntityIdList by_tile[LEVEL_WIDTH][LEVEL_HEIGHT];
 	logger_t* logger;
 } Level;
-// Entity #0 is always the player
-
-Entity init_player() {
-	Entity player = {0};
-	player.type = PLAYER;
-	player.position = (Vector2Int){ LEVEL_WIDTH/2, LEVEL_HEIGHT/2 };
-	player.inverse_speed = 10;
-	player.attack_delay = 10;
-	player.hp = 10;
-	player.damage = 5;
-	player.blocking = 1;
-	player.bumpable = 1;
-	return player;
-};
-
-unsigned add_entity(Level* level, Entity entity) {
-	unsigned ec = level->entity_count++;
-	if (ec >= MAX_ENTITIES) {
-		// UH OH!!
-		// TODO: log_msg("We hit the entity limit!\n");
-	}
-	level->entities[ec] = entity;
-	return ec;
-}
-
-unsigned add_wall(Level* level, int x, int y) {
-	Entity wall = {0};
-	wall.type = WALL;
-	wall.position = (Vector2Int){ x, y };
-	wall.blocking = 1;
-	return add_entity(level, wall);
-}
 
 Level init_level(
 	int level_number, 
@@ -111,7 +51,8 @@ Level init_level(
 	level.level_number = level_number;
 	if (prev_level->entities[0].type != PLAYER) {
 		// Create a new player
-		level.entities[0] = init_player();
+		Player(&level.entities[0]);
+		Position(&level.entities[0], LEVEL_WIDTH/2, LEVEL_HEIGHT/2);
 	} else {
 		// Copy the player from the previous level
 		memcpy(&level.entities[0], &prev_level->entities[0], sizeof(Entity));
@@ -120,24 +61,15 @@ Level init_level(
 
 	// Level Generation
 	for (int x=1; x<LEVEL_WIDTH-1; x++) {
-		add_wall(&level, x, 0);
-		add_wall(&level, x, LEVEL_HEIGHT-1);
+		Wall(&level.entities[level.entity_count++], x, 0);
+		Wall(&level.entities[level.entity_count++], x, LEVEL_HEIGHT-1);
 	}
 	for (int y=1; y<LEVEL_HEIGHT-1; y++) {
-		add_wall(&level, 0, y);
-		add_wall(&level, LEVEL_WIDTH-1, y);
+		Wall(&level.entities[level.entity_count++], 0, y);
+		Wall(&level.entities[level.entity_count++], LEVEL_WIDTH-1, y);
 	}
 
-	Entity* goblin = &level.entities[level.entity_count++];
-	goblin->type = ENEMY;
-	goblin->position = (Vector2Int){2, 2};
-	goblin->hp = 20;
-	goblin->damage = 2;
-	goblin->blocking = 1;
-	goblin->bumpable = 1;
-	goblin->inverse_speed = 5;
-	goblin->attack_delay = 2;
-
+	Goblin(&level.entities[level.entity_count++], 2, 2);
 
 	return level;
 };
@@ -236,22 +168,22 @@ EntityIdList entities_at_location(Level* level, Vector2Int position) {
 		if (e->position.x == position.x && e->position.y == position.y) {
 			// NOTE! result.count can overflow if too many items are in the same place! 
 			// If it does, it will be funny :^)
-			result.entity_ids[result.count] = i;
-			result.count++;
+			result.entity_ids[result.count++] = i;
 		}
 	}
 	return result;
 }
 
 char log_buf[1024];
-int deal_damage(Level* level, size_t target_id, int damage) {
+int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage) {
+	Entity* attacker = &level->entities[attacker_id];
 	Entity* target = &level->entities[target_id];
 	target->hp -= damage;
-	sprintf(log_buf, "Did %d damage to entity %ld\n", damage, target_id);
+	sprintf(log_buf, "%s did %d damage to %s\n", attacker->name, damage, target->name);
 	log_msg(level->logger, log_buf);
 	if (target->hp <= 0) {
 		target->type = NONE;
-		sprintf(log_buf, "entity %ld died\n", target_id);
+		sprintf(log_buf, "%s died\n", target->name);
 		log_msg(level->logger, log_buf);
 	}
 	return damage;
@@ -261,7 +193,7 @@ int entity_attack(Level* level, size_t attacker_id, size_t target_id) {
 	Entity* attacker = &level->entities[attacker_id];
 	if (++attacker->impetus_to_attack >= attacker->attack_delay) {
 		attacker->impetus_to_attack = 0;
-		return deal_damage(level, target_id, attacker->damage);
+		return deal_damage(level, attacker_id, target_id, attacker->damage);
 	}
 	return 0;
 }
