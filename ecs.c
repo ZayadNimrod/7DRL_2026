@@ -23,8 +23,8 @@ Vector2Int from_direction(enum Direction d) {
 }
 
 #define MAX_ENTITIES 4096
-#define LEVEL_WIDTH 40
-#define LEVEL_HEIGHT 25
+#define LEVEL_WIDTH 60
+#define LEVEL_HEIGHT 30
 
 
 
