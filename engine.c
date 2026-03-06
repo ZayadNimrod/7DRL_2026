@@ -23,6 +23,29 @@ Entity init_player()
 	return player;
 };
 
+EntityIdList entities_at_location(Level* level, Vector2Int position) {
+	EntityIdList result = {0};
+	for (size_t i=0; i<level->entity_count; i++) {
+		Entity* e = &level->entities[i];
+		if (e->type == NONE) continue;
+		if (e->position.x == position.x && e->position.y == position.y) {
+			// NOTE! result.count can overflow if too many items are in the same place! 
+			// If it does, it will be funny :^)
+			result.entity_ids[result.count++] = i;
+		}
+	}
+	return result;
+}
+
+
+void make_lookup(Level* level) {
+	for (int x=0; x<LEVEL_WIDTH; x++) {
+		for (int y=0; y<LEVEL_HEIGHT; y++) {
+			level->by_tile[x][y] = entities_at_location(level, (Vector2Int){x,y});
+		}
+	}
+}
+
 Level init_level(
 	int level_number,
 	Level* prev_level,
@@ -43,6 +66,7 @@ Level init_level(
 
 	generate_level(&level);
 
+	make_lookup(&level);
 	return level;
 };
 
@@ -71,65 +95,46 @@ typedef struct {
 	Vector2Int target;
 } PathfindingResult;
 
-/**
- * Uses depth-first search to find the shortest distance to target from any point in the level
- * You should run make_lookup(&level) before calling this function to update the reverse tile lookup
- */
-PathfindingResult pathfind(Level* level, Vector2Int target)
-{
-	PathfindingResult result = { 0 };
+#define WALL_LARGE_NUMBER 100000
+PathfindingResult pathfind(Level* level, Vector2Int target) {
+	PathfindingResult result = {0};
 	result.target = target;
-	Vector2Int queue[1 << 18];
-	int queue_distance[1 << 18];
-	int front = 0;
-	int back = 0;
-	queue[back++] = target;
-	queue_distance[back] = 0;
-
-	while (front < back) {
-		Vector2Int p = queue[front++];
-		int distance = queue_distance[front];
-		if (result.distance[p.x][p.y] != 0 && result.distance[p.x][p.y] < distance)
-			continue;
-		// If it's a wall, eat it
-		EntityIdList* es = &level->by_tile[p.x][p.y];
-		int blocked = 0;
-		for (size_t i = 0; i < es->count; i++) {
-			size_t e_id = es->entity_ids[i];
-			Entity* e = &level->entities[e_id];
-			if (e->blocking)
-				blocked = 1;
-		}
-		if (target.x == p.x && target.y == p.y) {
-			blocked = 0;
-			result.distance[p.x][p.y] = 0;
-		}
-		if (blocked) {
-			result.distance[p.x][p.y] = 255;
-		} else {
-			result.distance[p.x][p.y] = distance;
-			for (int x = p.x - 1; x <= p.x + 1; x++) {
-				for (int y = p.y - 1; y <= p.y + 1; y++) {
-					if (x < 0)
-						continue;
-					if (y < 0)
-						continue;
-					if (x >= LEVEL_WIDTH)
-						continue;
-					if (y >= LEVEL_HEIGHT)
-						continue;
-					if (x == p.x && y == p.y)
-						continue;
-					if (result.distance[x][y] > distance || result.distance[x][y] == 0) {
-						queue[back++] = (Vector2Int) { x, y };
-						queue_distance[back] = distance + 1;
-						result.distance[x][y] = distance + 1;
-					}
-				}
+	for (int x=0; x<LEVEL_WIDTH; x++) {
+		for (int y=0; y<LEVEL_HEIGHT; y++) {
+			result.distance[x][y] = -1;
+			EntityIdList entities_there = level->by_tile[x][y];
+			for (size_t i=0; i<entities_there.count; i++) {
+				size_t e_id = entities_there.entity_ids[i];
+				Entity* e = &level->entities[e_id];
+				if (e->blocking) result.distance[x][y] = WALL_LARGE_NUMBER;
 			}
 		}
 	}
 	result.distance[target.x][target.y] = 0;
+	int changed = 0;
+	do {
+		changed = 0;
+		for (int x=0; x<LEVEL_WIDTH; x++) {
+			for (int y=0; y<LEVEL_HEIGHT; y++) {
+				if (result.distance[x][y] == -1) {
+					for (int xo=-1; xo<=1; xo++) {
+						for (int yo=-1; yo<=1; yo++) {
+							if (x+xo < 0 || x+xo > LEVEL_WIDTH) continue;
+							if (y+yo < 0 || y+yo > LEVEL_HEIGHT) continue;
+							int d = result.distance[x+xo][y+yo];
+							if (d != -1 && d != WALL_LARGE_NUMBER) {
+								int new_distance = d+1;
+								if (result.distance[x][y] == -1 || result.distance[x][y] > new_distance) {
+									result.distance[x][y] = new_distance;
+									changed = 1;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	} while (changed);
 	return result;
 }
 
@@ -144,34 +149,7 @@ typedef struct {
 	Vector2Int target;
 } InputAction;
 
-EntityIdList entities_at_location(Level* level, Vector2Int position)
-{
-	EntityIdList result = { 0 };
-	for (size_t i = 0; i < level->entity_count; i++) {
-		Entity* e = &level->entities[i];
-		if (e->type == NONE)
-			continue;
-		if (e->position.x == position.x && e->position.y == position.y) {
-			// NOTE! result.count can overflow if too many items are in the same place!
-			// If it does, it will be funny :^)
-			result.entity_ids[result.count++] = i;
-		}
-	}
-	return result;
-}
-
-void make_lookup(Level* level)
-{
-	// Level Generation
-	for (int x = 0; x < LEVEL_WIDTH; x++) {
-		for (int y = 0; y < LEVEL_HEIGHT; y++) {
-			level->by_tile[x][y] = entities_at_location(level, (Vector2Int) { x, y });
-		}
-	}
-}
-
-int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage)
-{
+int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage) {
 	Entity* attacker = &level->entities[attacker_id];
 	Entity* target = &level->entities[target_id];
 	target->hp -= damage;
