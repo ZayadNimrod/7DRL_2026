@@ -215,21 +215,16 @@ void generate_level(Level* level)
 {
 	bsp_dungeon(level, LEVEL_WIDTH, LEVEL_HEIGHT);
 
-	// Level Generation
-	for (int x = 1; x < LEVEL_WIDTH - 1; x++) {
-		Wall(&level->entities[level->entity_count++], x, 0);
-		Wall(&level->entities[level->entity_count++], x, LEVEL_HEIGHT - 1);
-	}
-	for (int y = 1; y < LEVEL_HEIGHT - 1; y++) {
-		Wall(&level->entities[level->entity_count++], 0, y);
-		Wall(&level->entities[level->entity_count++], LEVEL_WIDTH - 1, y);
+	Vector2Int stair_pos;
+
+	while (1) {
+		stair_pos.x = rand() % LEVEL_WIDTH;
+		stair_pos.y = rand() % LEVEL_HEIGHT;
+
+		if (!is_walled(level,stair_pos)){
+			break;
+		}
 	}
 
-	Goblin(&level->entities[level->entity_count++], 2, 2);
-
-	// Spawn some items
-	Health(&level->entities[level->entity_count++], 5, 5, 10);
-	Gold(&level->entities[level->entity_count++], 8, 10, 10);
-	Armor(&level->entities[level->entity_count++], 15, 15, 10);
-	Arrows(&level->entities[level->entity_count++], 20, 20, 10);
+	Staircase(&level->entities[level->entity_count++],stair_pos.x,stair_pos.y);
 }

@@ -47,16 +47,14 @@ void make_lookup(Level* level) {
 
 Level init_level(
 	int level_number,
-	Level* prev_level,
-	logger_t* logger)
+	Level* prev_level)
 {
 	Level level = { 0 };
-	level.logger = logger;
+	level.logger = prev_level->logger;
 	level.level_number = level_number;
 	if (prev_level->entities[0].type != PLAYER) {
 		// Create a new player
 		Player(&level.entities[0]);
-		Position(&level.entities[0], LEVEL_WIDTH / 2, LEVEL_HEIGHT / 2);
 	} else {
 		// Copy the player from the previous level
 		memcpy(&level.entities[0], &prev_level->entities[0], sizeof(Entity));
@@ -64,6 +62,22 @@ Level init_level(
 	level.entity_count = 1;
 
 	generate_level(&level);
+
+	// randomise player position
+	Vector2Int player_pos;
+
+	while (1){
+
+		player_pos.x = rand() % LEVEL_WIDTH;
+		player_pos.y = rand() % LEVEL_HEIGHT;
+
+		
+		if (!is_walled(&level,player_pos)){
+			break;
+		}
+	}
+
+	Position(&level.entities[0], LEVEL_WIDTH / 2, LEVEL_HEIGHT / 2);
 
 	make_lookup(&level);
 	return level;
@@ -140,7 +154,8 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 enum ActionType {
 	WAIT,
 	WALK,
-	ATTACK
+	ATTACK,
+	DESCEND
 };
 
 typedef struct {
@@ -268,8 +283,27 @@ int tick_level(Level* level, InputAction input)
 			get_more_input = 1;
 		break;
 	case ATTACK: // TODO:
+		break;
 	case WAIT:
+		break;
+	case DESCEND:
+		Vector2Int player_pos = level->entities[0].position;
+		EntityIdList here = entities_at_location(level,player_pos);
+		for (size_t i = 0; i < here.count;i++){
+			Entity* entity_here = &level->entities[here.entity_ids[i]];
+			if (entity_here->type == STAIRCASE){
+				Level new_level = init_level(level->level_number+1,level);
+				*level = new_level;
+				log_msg(level->logger,"You descend the staircase..");				
+				return 0;
+			}
+		}
+
+		log_msg(level->logger,"There is no staircase here.");
+		break;
 	default:
+		log_msg(level->logger,"Illegal action");
+		break;
 	}
 
 	for (size_t i = 0; i < level->entity_count; i++) {

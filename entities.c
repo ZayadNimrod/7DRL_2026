@@ -9,6 +9,7 @@ enum EntityType {
 	WALL,
 	ENEMY,
 	ITEM,
+	STAIRCASE,
 };
 
 typedef struct {
@@ -102,5 +103,9 @@ void Gold(Entity* e, int x, int y, int amount) {
 	e->gold = amount;
 }
 
+void Staircase(Entity* e, int x, int y){
+	e->type = STAIRCASE;
+	Position(e, x, y);
+}
 
 #endif

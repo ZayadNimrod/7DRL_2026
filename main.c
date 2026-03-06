@@ -20,6 +20,8 @@ display_t entity_char(Entity* entity)
 		return (display_t) { .character = '#', .attributes = A_NORMAL };
 	case ENEMY:
 		return (display_t) { .character = 'e', .attributes = COLOR_PAIR(1) };
+	case STAIRCASE:
+		return (display_t) { .character = '>', .attributes = A_BOLD };
 	default:
 		return (display_t) { .character = '?', .attributes = A_BLINK };
 	}
@@ -38,7 +40,7 @@ void render_map(Level* world)
 {
 	wclear(map_window);
 
-	for (unsigned i = 0; i < world->entity_count; i++) {
+	for (int i = world->entity_count - 1; i >= 0; i--) {
 		Entity* e = &world->entities[i];
 		display_t d = entity_char(e);
 		if (d.character != 0) {
@@ -113,15 +115,16 @@ int main()
 	refresh();
 
 	Level level = { 0 };
-	level = init_level(0, &level, &logger);
+	level.logger = &logger;
+	level = init_level(0, &level);
 
 	map_window = newwin(LEVEL_HEIGHT, LEVEL_WIDTH, 0, 0);
 	log_window = newwin(MAX_LOGS, MAX_LOG_LEN, LEVEL_HEIGHT - MAX_LOGS, LEVEL_WIDTH);
 	stat_window = newwin(LEVEL_HEIGHT - MAX_LOGS - 1, MAX_LOG_LEN, 0, LEVEL_WIDTH);
 
-	log_msg(&logger, "This is a log");
-	log_msg(&logger, "This is another log");
-	log_msg(&logger, "Here is another log that is so long that it should go over multiple lines beep boop bap bop.");
+	//log_msg(&logger, "This is a log");
+	//log_msg(&logger, "This is another log");
+	//log_msg(&logger, "Here is another log that is so long that it should go over multiple lines beep boop bap bop.");
 
 	InputAction last_action;
 	while (true) {
@@ -174,11 +177,15 @@ int main()
 				last_action.type   = WAIT;
 				last_action.target = player_position;
 				break;
+			case '>':
+				last_action.type = DESCEND;
+				last_action.target = player_position;
+				break;
 			default:
 				continue;
 		}
-		
-		while(tick_level(&level,last_action)){}
+
+		while (tick_level(&level, last_action)) { }
 	}
 	return 0;
 }

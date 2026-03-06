@@ -42,5 +42,14 @@ typedef struct {
 } Level;
 // Entity #0 is always the player
 
+bool is_walled(Level* level, Vector2Int position){
+	for (unsigned i = 0; i < level->entity_count;i++){
+		Entity* e = &(level->entities[i]);
+		if (e->position.x == position.x && e->position.y == position.y && e->type == WALL){
+			return true;			
+		}
+	}
+	return false;
+}
 
 #endif
