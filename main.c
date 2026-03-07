@@ -33,7 +33,27 @@ WINDOW* stat_window;
 
 void render_stats(Level* world)
 {
-	(void)world;
+	Entity* player = &world->entities[0];
+
+	char numbuf[3];
+	wmove(stat_window,1,1);
+	waddstr(stat_window, "HP:");
+	sprintf(numbuf, "%i",player->hp);
+	waddstr(stat_window,numbuf);
+	wmove(stat_window,2,1);
+	waddstr(stat_window, "Armour:");
+	sprintf(numbuf, "%i",player->armor);
+	waddstr(stat_window,numbuf);
+	wmove(stat_window,3,1);
+	waddstr(stat_window, "Arrows:");
+	sprintf(numbuf, "%i",player->arrows);
+	waddstr(stat_window,numbuf);
+	wmove(stat_window,4,1);
+	waddstr(stat_window, "Gold:");
+	sprintf(numbuf, "%i",player->gold);
+	waddstr(stat_window,numbuf);
+
+	wrefresh(stat_window);
 }
 
 void render_map(Level* world)
@@ -92,7 +112,7 @@ int quit()
 int main()
 {
 	const int MAX_LOGS = LEVEL_HEIGHT / 2;
-	const int MAX_LOG_LEN = 80 - LEVEL_WIDTH;
+	const int MAX_LOG_LEN = 100 - LEVEL_WIDTH;
 	logger_t logger = *init_logger(MAX_LOGS, MAX_LOG_LEN);
 
 	// srand(time(0));
