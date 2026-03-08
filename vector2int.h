@@ -7,6 +7,7 @@ typedef struct {
 } Vector2Int;
 
 Vector2Int vec2add(Vector2Int a, Vector2Int b) { Vector2Int result = { a.x + b.x, a.y + b.y }; return result; }
+Vector2Int vec2sub(Vector2Int a, Vector2Int b) { Vector2Int result = { a.x - b.x, a.y - b.y }; return result; }
 
 enum Direction { STILL, NORTH, NORTH_EAST, EAST, SOUTH_EAST, SOUTH, SOUTH_WEST, WEST, NORTH_WEST };
 

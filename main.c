@@ -100,6 +100,30 @@ int quit()
 	return 0;
 }
 
+
+Vector2Int char2target(char input, Vector2Int player_position){
+	switch (input){
+		case 'h': case '4':
+			return vec2add(player_position,from_direction(WEST));
+		case 'j': case '2':
+			return vec2add(player_position,from_direction(SOUTH));
+		case 'l': case '6':
+			return vec2add(player_position,from_direction(EAST));
+		case 'k': case '8':
+			return vec2add(player_position,from_direction(NORTH));
+		case 'y': case '7':
+			return vec2add(player_position,from_direction(NORTH_WEST));
+		case 'u': case '9':
+			return vec2add(player_position,from_direction(NORTH_EAST));
+		case 'm': case '3':
+			return vec2add(player_position,from_direction(SOUTH_EAST));
+		case 'n': case '1':
+			return vec2add(player_position,from_direction(SOUTH_WEST));
+		default:
+			return player_position;
+	}
+}
+
 int main()
 {
 	const int MAX_LOGS = LEVEL_HEIGHT / 2;
@@ -126,10 +150,6 @@ int main()
 	log_window = newwin(MAX_LOGS, MAX_LOG_LEN, LEVEL_HEIGHT - MAX_LOGS, LEVEL_WIDTH);
 	stat_window = newwin(LEVEL_HEIGHT - MAX_LOGS - 1, MAX_LOG_LEN, 0, LEVEL_WIDTH);
 
-	//log_msg(&logger, "This is a log");
-	//log_msg(&logger, "This is another log");
-	//log_msg(&logger, "Here is another log that is so long that it should go over multiple lines beep boop bap bop.");
-
 	InputAction last_action;
 	while (true) {
 		render(&level, &logger);
@@ -142,40 +162,18 @@ int main()
 			case 'q':
 				return quit();
 			case '?':
-				log_msg(&logger, "Use the numpad or hjklyunm (vim keys) to move");
+				log_msg(&logger, "Use the numpad or hjklyunm (vim keys) to move. Shoot arrows with f.");
 				continue;
 				break;
 			case 'h': case '4':
-				last_action.type   = WALK;
-				last_action.target = vec2add(player_position,from_direction(WEST));
-				break;
 			case 'j': case '2':
-				last_action.type   = WALK;
-				last_action.target = vec2add(player_position,from_direction(SOUTH));
-				break;
 			case 'l': case '6':
-				last_action.type   = WALK;
-				last_action.target = vec2add(player_position,from_direction(EAST));
-				break;
 			case 'k': case '8':
-				last_action.type   = WALK;
-				last_action.target = vec2add(player_position,from_direction(NORTH));
-				break;
 			case 'y': case '7':
-				last_action.type   = WALK;
-				last_action.target = vec2add(player_position,from_direction(NORTH_WEST));
-				break;
 			case 'u': case '9':
-				last_action.type   = WALK;
-				last_action.target = vec2add(player_position,from_direction(NORTH_EAST));
-				break;
 			case 'm': case '3':
-				last_action.type   = WALK;
-				last_action.target = vec2add(player_position,from_direction(SOUTH_EAST));
-				break;
 			case 'n': case '1':
 				last_action.type   = WALK;
-				last_action.target = vec2add(player_position,from_direction(SOUTH_WEST));
 				break;
 			case '.': case '5':
 				last_action.type   = WAIT;
@@ -185,8 +183,27 @@ int main()
 				last_action.type = DESCEND;
 				last_action.target = player_position;
 				break;
+			case 'f':
+				if(level.entities[0].arrows<=0){
+					log_msg(&logger, "You have no arrows to fire.");	
+					continue;
+				}
+				log_msg(&logger, "Choose a direction (numpad/vim-keys):");			
+				render(&level, &logger);
+				input = getch();
+				last_action.target = char2target(input, player_position);
+				last_action.type = SHOOT;
+				if(last_action.target.x==player_position.x && last_action.target.y == player_position.y){
+					log_msg(&logger, "Invalid direction.");
+					continue;	
+				}
+				break;
 			default:
 				continue;
+		}
+
+		if (last_action.type == WALK){
+			last_action.target = char2target(input, player_position);
 		}
 
 		while (tick_level(&level, last_action)) { }

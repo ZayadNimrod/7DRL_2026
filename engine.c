@@ -75,7 +75,94 @@ void make_lookup(Level* level) {
 
 #include "level_gen.c"
 
-void update_player_vision(Level* level);
+
+
+#define WALL_LARGE_NUMBER 100000
+
+typedef struct {
+	int distance[LEVEL_WIDTH][LEVEL_HEIGHT];
+	Vector2Int target;
+} PathfindingResult;
+
+PathfindingResult pathfind(Level* level, Vector2Int target) {
+	PathfindingResult result = {0};
+	result.target = target;
+	for (int x=0; x<LEVEL_WIDTH; x++) {
+		for (int y=0; y<LEVEL_HEIGHT; y++) {
+			result.distance[x][y] = -1;
+			EntityIdList entities_there = level->by_tile[x][y];
+			for (size_t i=0; i<entities_there.count; i++) {
+				size_t e_id = entities_there.entity_ids[i];
+				Entity* e = &level->entities[e_id];
+				if (e->blocking) result.distance[x][y] = WALL_LARGE_NUMBER;
+			}
+		}
+	}
+	result.distance[target.x][target.y] = 0;
+	int changed = 0;
+	do {
+		changed = 0;
+		for (int x=0; x<LEVEL_WIDTH; x++) {
+			for (int y=0; y<LEVEL_HEIGHT; y++) {
+				if (result.distance[x][y] == -1) {
+					for (int xo=-1; xo<=1; xo++) {
+						for (int yo=-1; yo<=1; yo++) {
+							if (is_in_bounds((Vector2Int){x+xo, y+yo})) continue;
+							int d = result.distance[x+xo][y+yo];
+							if (d != -1 && d != WALL_LARGE_NUMBER) {
+								int new_distance = d+1;
+								if (result.distance[x][y] == -1 || result.distance[x][y] > new_distance) {
+									result.distance[x][y] = new_distance;
+									changed = 1;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	} while (changed);
+	return result;
+}
+
+
+typedef struct {
+	int tiles[LEVEL_WIDTH][LEVEL_HEIGHT];
+} LevelGridInt;
+
+
+LevelGridInt player_vision(Level* level) {
+	LevelGridInt result = {0};
+	PathfindingResult player_pf = pathfind(level, level->entities[0].position);
+	for (int y = 0; y<LEVEL_HEIGHT; y++) {
+		for (int x = 0; x<LEVEL_WIDTH; x++) {
+			if (player_pf.distance[x][y] <= level->entities[0].vision) {
+				for (int yo=-1; yo<=1; yo++) {
+					for (int xo=-1; xo<=1; xo++) {
+						if (is_in_bounds((Vector2Int){x+xo, y+yo})) continue;
+						result.tiles[x+xo][y+yo] = 1;
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
+
+void update_player_vision(Level* level) {
+	LevelGridInt vision = player_vision(level);
+	for (int y = 0; y<LEVEL_HEIGHT; y++) {
+		for (int x = 0; x<LEVEL_WIDTH; x++) {
+			if (!vision.tiles[x][y]) continue;
+			EntityIdList here = entities_at_location(level,(Vector2Int){x, y});
+			for (size_t i = 0; i < here.count; i++) {
+				Entity* entity_here = &level->entities[here.entity_ids[i]];
+				entity_here->explored = 1;
+			}
+		}
+	}
+}
+
 
 Level init_level(
 	int level_number,
@@ -123,59 +210,12 @@ void print_level(Level* level)
 	}
 }
 
-typedef struct {
-	int distance[LEVEL_WIDTH][LEVEL_HEIGHT];
-	Vector2Int target;
-} PathfindingResult;
-
-#define WALL_LARGE_NUMBER 100000
-PathfindingResult pathfind(Level* level, Vector2Int target) {
-	PathfindingResult result = {0};
-	result.target = target;
-	for (int x=0; x<LEVEL_WIDTH; x++) {
-		for (int y=0; y<LEVEL_HEIGHT; y++) {
-			result.distance[x][y] = -1;
-			EntityIdList entities_there = level->by_tile[x][y];
-			for (size_t i=0; i<entities_there.count; i++) {
-				size_t e_id = entities_there.entity_ids[i];
-				Entity* e = &level->entities[e_id];
-				if (e->blocking) result.distance[x][y] = WALL_LARGE_NUMBER;
-			}
-		}
-	}
-	result.distance[target.x][target.y] = 0;
-	int changed = 0;
-	do {
-		changed = 0;
-		for (int x=0; x<LEVEL_WIDTH; x++) {
-			for (int y=0; y<LEVEL_HEIGHT; y++) {
-				if (result.distance[x][y] == -1) {
-					for (int xo=-1; xo<=1; xo++) {
-						for (int yo=-1; yo<=1; yo++) {
-							if (is_in_bounds((Vector2Int){x+xo, y+yo})) {
-								int d = result.distance[x+xo][y+yo];
-								if (d != -1 && d != WALL_LARGE_NUMBER) {
-									int new_distance = d+1;
-									if (result.distance[x][y] == -1 || result.distance[x][y] > new_distance) {
-										result.distance[x][y] = new_distance;
-										changed = 1;
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	} while (changed);
-	return result;
-}
-
 enum ActionType {
 	WAIT,
 	WALK,
 	ATTACK,
-	DESCEND
+	DESCEND,
+	SHOOT
 };
 
 typedef struct {
@@ -183,30 +223,34 @@ typedef struct {
 	Vector2Int target;
 } InputAction;
 
-int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage)
+int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage, bool visible)
 {
 	Entity* attacker = &level->entities[attacker_id];
 	Entity* target = &level->entities[target_id];
 	target->hp -= damage;
-	sprintf(log_buf, "%s did %d damage to %s\n", attacker->name, damage, target->name);
-	log_msg(level->logger, log_buf);
+	if(visible) {
+		sprintf(log_buf, "%s did %d damage to %s\n", attacker->name, damage, target->name);
+		log_msg(level->logger, log_buf);
+	}
 	if (target->hp <= 0) {
 		target->type = NONE;
-		sprintf(log_buf, "%s died\n", target->name);
-		log_msg(level->logger, log_buf);
+		if(visible) {
+			sprintf(log_buf, "%s died\n", target->name);
+			log_msg(level->logger, log_buf);
+		}
 		make_lookup(level);
 	}
 	return damage;
 }
 
-int entity_attack(Level* level, size_t attacker_id, size_t target_id)
+int entity_attack(Level* level, size_t attacker_id, size_t target_id, bool visible)
 {
 	Entity* attacker = &level->entities[attacker_id];
 	if (attacker->type == NONE)
 		return -1;
 	if (++attacker->impetus_to_attack >= attacker->attack_delay) {
 		attacker->impetus_to_attack = 0;
-		return deal_damage(level, attacker_id, target_id, attacker->damage);
+		return deal_damage(level, attacker_id, target_id, attacker->damage, visible);
 	}
 	return 0;
 }
@@ -251,7 +295,10 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target)
 	for (size_t i = 0; i < entities_there.count; i++) {
 		size_t e_id = entities_there.entity_ids[i];
 		Entity* e = &level->entities[e_id];
-		if (e->bumpable) return entity_attack(level, entity_id, e_id);
+		if (e->bumpable) {
+			LevelGridInt player_vis = player_vision(level);
+			return entity_attack(level, entity_id, e_id,player_vis.tiles[desired_position.x][desired_position.y]);
+		};
 		if (e->blocking) return -1;
 	}
 	entity->impetus_to_move++;
@@ -302,8 +349,7 @@ int tick_level(Level* level, InputAction input)
 		case WAIT:
 			break;
 		case DESCEND:
-			Vector2Int player_pos = level->entities[0].position;
-			EntityIdList here = entities_at_location(level,player_pos);
+			EntityIdList here = entities_at_location(level,level->entities[0].position);
 			int staircase_found = 0;
 			for (size_t i = 0; i < here.count; i++) {
 				Entity* entity_here = &level->entities[here.entity_ids[i]];
@@ -316,6 +362,43 @@ int tick_level(Level* level, InputAction input)
 			} else {
 				log_msg(level->logger,"There is no staircase here.");
 			}
+			break;
+		case SHOOT:
+			level->entities[0].arrows--;
+			Vector2Int offset = vec2sub(input.target,level->entities[0].position);
+			Vector2Int target_position = level->entities[0].position;
+			LevelGridInt player_vis = player_vision(level);
+			const int SHOOT_RANGE = 10;
+			const int ARROW_DAMAGE = 3;
+			for(int i =0 ;i< SHOOT_RANGE;i++){
+				target_position = vec2add(target_position,offset);
+				EntityIdList entities_here = entities_at_location(level,target_position);
+				for (size_t j = 0; j < entities_here.count; j++) {
+					int entity_id = entities_here.entity_ids[j];
+					Entity* entity_here = &level->entities[entity_id];
+					if (entity_here->type == WALL) {
+						if (player_vis.tiles[target_position.x][target_position.y]){
+							log_msg(level->logger,"The arrow bounces off the wall.");
+						}else{
+							log_msg(level->logger,"You hear the arrow bounce off a wall.");
+						}
+						goto shootingDone;
+					}
+					else if (entity_here->type==ENEMY){
+						deal_damage(level, 0, entity_id, ARROW_DAMAGE, player_vis.tiles[target_position.x][target_position.y]);
+						if (!player_vis.tiles[target_position.x][target_position.y]){
+							log_msg(level->logger,"The arrow hits something!");
+						}
+						goto shootingDone;
+					}
+
+				}
+			}
+
+			if (player_vis.tiles[target_position.x][target_position.y])
+				log_msg(level->logger,"The arrow falls to the ground.");
+			shootingDone:		
+			
 			break;
 		default:
 			log_msg(level->logger,"Illegal action");
@@ -336,39 +419,6 @@ int tick_level(Level* level, InputAction input)
 	}
 
 	return get_more_input;
-}
-
-LevelGridInt player_vision(Level* level) {
-	PathfindingResult player_pf = pathfind(level, level->entities[0].position);
-	LevelGridInt result = {0};
-	for (int y = 0; y<LEVEL_HEIGHT; y++) {
-		for (int x = 0; x<LEVEL_WIDTH; x++) {
-			if (player_pf.distance[x][y] <= level->entities[0].vision) {
-				for (int yo=-1; yo<=1; yo++) {
-					for (int xo=-1; xo<=1; xo++) {
-						if (is_in_bounds((Vector2Int){x+xo, y+yo})) {
-							result.tiles[x+xo][y+yo] = 1;
-						}
-					}
-				}
-			}
-		}
-	}
-	return result;
-}
-
-void update_player_vision(Level* level) {
-	LevelGridInt vision = player_vision(level);
-	for (int y = 0; y<LEVEL_HEIGHT; y++) {
-		for (int x = 0; x<LEVEL_WIDTH; x++) {
-			if (!vision.tiles[x][y]) continue;
-			EntityIdList here = entities_at_location(level,(Vector2Int){x, y});
-			for (size_t i = 0; i < here.count; i++) {
-				Entity* entity_here = &level->entities[here.entity_ids[i]];
-				entity_here->explored = 1;
-			}
-		}
-	}
 }
 
 
