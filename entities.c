@@ -48,7 +48,7 @@ void Combat(Entity* e, int hp, int damage, int attack_delay) {
 	e->damage = damage;
 	e->attack_delay = attack_delay;
 	e->bumpable = 1;
-	e->blocking = 1;
+	e->vision = 8;
 }
 
 void Movement(Entity* e, int inverse_speed) {

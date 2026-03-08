@@ -31,9 +31,9 @@ WINDOW* map_window;
 WINDOW* log_window;
 WINDOW* stat_window;
 
-void render_stats(Level* world)
+void render_stats(Level* level)
 {
-	Entity* player = &world->entities[0];
+	Entity* player = &level->entities[0];
 
 	char numbuf[3];
 	wmove(stat_window,1,1);
@@ -56,15 +56,21 @@ void render_stats(Level* world)
 	wrefresh(stat_window);
 }
 
-void render_map(Level* world)
+void render_map(Level* level)
 {
 	wclear(map_window);
 
-	for (int i = world->entity_count - 1; i >= 0; i--) {
-		Entity* e = &world->entities[i];
+	LevelGridInt player_vis = player_vision(level);
+	for (int i = level->entity_count - 1; i >= 0; i--) {
+		Entity* e = &level->entities[i];
 		display_t d = entity_char(e);
 		if (d.character != 0) {
-			d.attributes = COLOR_PAIR(2); // TODO: Make this light grey somehow
+			if (!e->explored) {
+				d.character = ' ';
+			}
+			else if (player_vis.tiles[e->position.x][e->position.y] == 0) {
+				d.attributes = COLOR_PAIR(7); // TODO: Make a muted color
+			}
 			wattron(map_window, d.attributes);
 			Vector2Int position = e->position;
 			mvwaddch(map_window, position.y, position.x, d.character);
@@ -96,11 +102,11 @@ void render_log(logger_t* logger)
 	wrefresh(log_window);
 }
 
-void render(Level* world, logger_t* logger)
+void render(Level* level, logger_t* logger)
 {
-	render_map(world);
+	render_map(level);
 	render_log(logger);
-	render_stats(world);
+	render_stats(level);
 }
 
 int quit()
@@ -129,6 +135,7 @@ int main()
 	init_pair(4, COLOR_CYAN, COLOR_BLACK);
 	init_pair(5, COLOR_BLUE, COLOR_BLACK);
 	init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
+	init_pair(7, COLOR_BLACK, COLOR_BLACK);
 
 	curs_set(0); // hide cursor
 	noecho();

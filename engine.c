@@ -12,6 +12,12 @@
 #define LEVEL_WIDTH 60
 #define LEVEL_HEIGHT 30
 
+int is_in_bounds(Vector2Int position) {
+	if (position.x < 0 || position.x > LEVEL_WIDTH) return 0;
+	if (position.y < 0 || position.y > LEVEL_HEIGHT) return 0;
+	return 1;
+}
+
 typedef struct {
 	size_t entity_ids[32];
 	size_t count;
@@ -65,6 +71,8 @@ void make_lookup(Level* level) {
 
 #include "level_gen.c"
 
+void update_player_vision(Level* level);
+
 Level init_level(
 	int level_number,
 	Level* prev_level)
@@ -87,6 +95,7 @@ Level init_level(
 	randomize_position(&level, &level.entities[0]);
 
 	make_lookup(&level);
+	update_player_vision(&level);
 	return level;
 };
 
@@ -115,6 +124,10 @@ typedef struct {
 	Vector2Int target;
 } PathfindingResult;
 
+typedef struct {
+	int tiles[LEVEL_WIDTH][LEVEL_HEIGHT];
+} LevelGridInt;
+
 #define WALL_LARGE_NUMBER 100000
 PathfindingResult pathfind(Level* level, Vector2Int target) {
 	PathfindingResult result = {0};
@@ -139,8 +152,7 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 				if (result.distance[x][y] == -1) {
 					for (int xo=-1; xo<=1; xo++) {
 						for (int yo=-1; yo<=1; yo++) {
-							if (x+xo < 0 || x+xo > LEVEL_WIDTH) continue;
-							if (y+yo < 0 || y+yo > LEVEL_HEIGHT) continue;
+							if (!is_in_bounds((Vector2Int){x+xo, y+yo})) continue;
 							int d = result.distance[x+xo][y+yo];
 							if (d != -1 && d != WALL_LARGE_NUMBER) {
 								int new_distance = d+1;
@@ -217,10 +229,7 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target)
 		int current_dist = path.distance[p.x][p.y];
 		for (int x = p.x - 1; x <= p.x + 1; x++) {
 			for (int y = p.y - 1; y <= p.y + 1; y++) {
-				if (x < 0) continue;
-				if (y < 0) continue;
-				if (x >= LEVEL_WIDTH) continue;
-				if (y >= LEVEL_HEIGHT) continue;
+				if (!is_in_bounds((Vector2Int){x, y})) continue;
 				if (x == p.x && y == p.y) continue;
 				if (path.distance[x][y] < current_dist) {
 					dir.x = x - p.x;
@@ -277,34 +286,34 @@ int tick_level(Level* level, InputAction input)
 	make_lookup(level);
 	int get_more_input = 0;
 	switch (input.type) {
-	case WALK:
-		int has_moved = entity_walk(level, 0 /* player is entity 0 */, input.target);
-		// Simluate more ticks unless we've finished moving:
-		if (!has_moved)
-			get_more_input = 1;
-		break;
-	case ATTACK: // TODO:
-		break;
-	case WAIT:
-		break;
-	case DESCEND:
-		Vector2Int player_pos = level->entities[0].position;
-		EntityIdList here = entities_at_location(level,player_pos);
-		for (size_t i = 0; i < here.count;i++){
-			Entity* entity_here = &level->entities[here.entity_ids[i]];
-			if (entity_here->type == STAIRCASE){
-				Level new_level = init_level(level->level_number+1,level);
+		case WALK:
+			int has_moved = entity_walk(level, 0 /* player is entity 0 */, input.target);
+			// Simluate more ticks unless we've finished moving:
+			if (!has_moved) get_more_input = 1;
+			break;
+		case ATTACK: // TODO:
+			break;
+		case WAIT:
+			break;
+		case DESCEND:
+			Vector2Int player_pos = level->entities[0].position;
+			EntityIdList here = entities_at_location(level,player_pos);
+			int staircase_found = 0;
+			for (size_t i = 0; i < here.count; i++) {
+				Entity* entity_here = &level->entities[here.entity_ids[i]];
+				if (entity_here->type == STAIRCASE) staircase_found = 1;
+			}
+			if (staircase_found) {
+				Level new_level = init_level(level->level_number+1, level);
 				*level = new_level;
 				log_msg(level->logger,"You descend the staircase..");				
-				return 0;
+			} else {
+				log_msg(level->logger,"There is no staircase here.");
 			}
-		}
-
-		log_msg(level->logger,"There is no staircase here.");
-		break;
-	default:
-		log_msg(level->logger,"Illegal action");
-		break;
+			break;
+		default:
+			log_msg(level->logger,"Illegal action");
+			break;
 	}
 
 	for (size_t i = 0; i < level->entity_count; i++) {
@@ -316,7 +325,44 @@ int tick_level(Level* level, InputAction input)
 		}
 	}
 
+	if (!get_more_input) {
+		update_player_vision(level);
+	}
+
 	return get_more_input;
 }
+
+LevelGridInt player_vision(Level* level) {
+	LevelGridInt result = {0};
+	PathfindingResult player_pf = pathfind(level, level->entities[0].position);
+	for (int y = 0; y<LEVEL_HEIGHT; y++) {
+		for (int x = 0; x<LEVEL_WIDTH; x++) {
+			if (player_pf.distance[x][y] <= level->entities[0].vision) {
+				for (int yo=-1; yo<=1; yo++) {
+					for (int xo=-1; xo<=1; xo++) {
+						if (!is_in_bounds((Vector2Int){x+xo, y+yo})) continue;
+						result.tiles[x+xo][y+yo] = 1;
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
+
+void update_player_vision(Level* level) {
+	LevelGridInt vision = player_vision(level);
+	for (int y = 0; y<LEVEL_HEIGHT; y++) {
+		for (int x = 0; x<LEVEL_WIDTH; x++) {
+			if (!vision.tiles[x][y]) continue;
+			EntityIdList here = entities_at_location(level,(Vector2Int){x, y});
+			for (size_t i = 0; i < here.count; i++) {
+				Entity* entity_here = &level->entities[here.entity_ids[i]];
+				entity_here->explored = 1;
+			}
+		}
+	}
+}
+
 
 #endif
