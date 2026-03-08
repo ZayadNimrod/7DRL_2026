@@ -4,29 +4,6 @@
 #include <ncurses.h>
 #include <stdlib.h>
 
-typedef struct {
-	char character;
-	int attributes;
-} display_t;
-
-display_t entity_char(Entity* entity)
-{
-	switch (entity->type) {
-	case NONE:
-		return (display_t) { .character = 0, .attributes = A_NORMAL };
-	case PLAYER:
-		return (display_t) { .character = '@', .attributes = A_BOLD };
-	case WALL:
-		return (display_t) { .character = '#', .attributes = A_NORMAL };
-	case ENEMY:
-		return (display_t) { .character = 'e', .attributes = COLOR_PAIR(1) };
-	case STAIRCASE:
-		return (display_t) { .character = '>', .attributes = A_BOLD };
-	default:
-		return (display_t) { .character = '?', .attributes = A_BLINK };
-	}
-}
-
 WINDOW* map_window;
 WINDOW* log_window;
 WINDOW* stat_window;
@@ -63,20 +40,22 @@ void render_map(Level* level)
 	LevelGridInt player_vis = player_vision(level);
 	for (int i = level->entity_count - 1; i >= 0; i--) {
 		Entity* e = &level->entities[i];
-		display_t d = entity_char(e);
-		if (d.character != 0) {
-			if (!e->explored) {
-				d.character = ' ';
-			}
-			else if (player_vis.tiles[e->position.x][e->position.y] == 0) {
-				d.attributes = COLOR_PAIR(7); // TODO: Make a muted color
-			}
-			wattron(map_window, d.attributes);
-			Vector2Int position = e->position;
-			mvwaddch(map_window, position.y, position.x, d.character);
-			wattroff(map_window, d.attributes);
-			wattron(map_window, COLOR_PAIR(0));
+
+		int attributes = 0;
+		if (e->type==NONE || !e->explored) {
+			attributes |= A_INVIS;
 		}
+		else if (player_vis.tiles[e->position.x][e->position.y] == 0) {
+			attributes |= A_DIM;
+		}
+		wattron(map_window, COLOR_PAIR(e->color_pair));
+		wattron(map_window, attributes);
+		Vector2Int position = e->position;
+		mvwaddch(map_window, position.y, position.x, e->avatar);
+		wattroff(map_window, COLOR_PAIR(e->color_pair));
+		wattroff(map_window, attributes);
+
+		wattron(map_window, COLOR_PAIR(0));
 	}
 
 	wrefresh(map_window);

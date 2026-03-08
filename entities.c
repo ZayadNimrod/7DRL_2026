@@ -34,6 +34,9 @@ typedef struct {
 	int vision; // How many tiles away can this see?
 	int explored; // Has the player seen this tile before?
 	int is_static; // Whether this should update when it's not in the player's line of sight.
+	char avatar;
+	short color_pair;
+	int ncurses_attributes; // Combine attributes like A_BOLD || A_UNDERLINE
 } Entity; 
 
 // The following functions are helper functions for instantiating entities:
@@ -58,6 +61,7 @@ void Movement(Entity* e, int inverse_speed) {
 void Player(Entity* e) {
 	e->type = PLAYER;
 	e->name = "Dormin";
+	e->avatar = '@';
 	Combat(e, 10, 5, 10);
 	Movement(e, 10);
 }
@@ -65,6 +69,7 @@ void Player(Entity* e) {
 void Wall(Entity* e, int x, int y) {
 	e->name = "Wall";
 	e->type = WALL;
+	e->avatar = '#';
 	e->blocking = 1;
 	e->hp = 1000;
 	e->is_static = 1;
@@ -74,6 +79,8 @@ void Wall(Entity* e, int x, int y) {
 void Goblin(Entity* e, int x, int y) {
 	e->name = "Goblin";
 	e->type = ENEMY;
+	e->avatar = 'g';
+	e->color_pair = 1;
 	Position(e, x, y);
 	Combat(e, 15, 1, 15);
 	Movement(e, 12);
@@ -87,6 +94,7 @@ void Item(Entity *e) {
 void Arrows(Entity* e, int x, int y, int amount) {
 	Item(e);
 	e->name = "a bundle of arrows";
+	e->avatar = '&';
 	Position(e, x, y);
 	e->arrows = amount;
 }
@@ -94,6 +102,7 @@ void Arrows(Entity* e, int x, int y, int amount) {
 void Armor(Entity* e, int x, int y, int amount) {
 	Item(e);
 	e->name = "an armor shard";
+	e->avatar = '\'';
 	Position(e, x, y);
 	e->armor = amount;
 }
@@ -101,6 +110,7 @@ void Armor(Entity* e, int x, int y, int amount) {
 void Health(Entity* e, int x, int y, int amount) {
 	Item(e);
 	e->name = "a health potion";
+	e->avatar = '+';
 	Position(e, x, y);
 	e->hp = amount;
 }
@@ -108,12 +118,14 @@ void Health(Entity* e, int x, int y, int amount) {
 void Gold(Entity* e, int x, int y, int amount) {
 	Item(e);
 	e->name = "a bag of gold";
+	e->avatar = '$';
 	Position(e, x, y);
 	e->gold = amount;
 }
 
 void Staircase(Entity* e){
 	e->type = STAIRCASE;
+	e->avatar = '>';
 }
 
 #endif
