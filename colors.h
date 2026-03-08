@@ -17,6 +17,7 @@ enum GameColors {
 	GC_staircase,
 	GC_health,
 	GC_arrows,
+	GC_map,
 };
 
 #define BG_COLOR COLOR_BLACK
@@ -40,7 +41,8 @@ void define_colors() {
 	pair(GC_gold, BG_COLOR, 220, 58, BG_COLOR);
 	pair(GC_staircase, 233, 252, 252, BG_COLOR);
 	pair(GC_arrows, 223, BG_COLOR, 130, BG_COLOR);
-	pair(GC_health, 196, 255, 124, BG_COLOR); // to piss off the Red Cross (fuck you doctors! I'll use a red cross if I want to)
+	pair(GC_health, 196, 255, 124, BG_COLOR); // to piss off the Red Cross (fuck you doctors! I'll use a red cross if I want to...)
+	pair(GC_map, 19, 137, 143, BG_COLOR);
 }
 
 #endif

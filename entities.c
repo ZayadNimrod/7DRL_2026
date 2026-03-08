@@ -34,6 +34,8 @@ typedef struct {
 	int armor;
 	int gold;
 	int vision; // How many tiles away can this see?
+	int map;
+
 	int explored; // Has the player seen this tile before?
 	int is_static; // Whether this should update when it's not in the player's line of sight.
 	char avatar;
@@ -132,6 +134,16 @@ Entity* Health(Entity* e, int amount) {
 	e->color_pair = GC_health;
 	e->attributes = A_BOLD;
 	e->hp = amount;
+	return e;
+}
+
+Entity* Map(Entity* e, int level_number) {
+	Item(e);
+	e->name = "a map of the floor";
+	e->avatar = 'M';
+	e->color_pair = GC_map;
+	e->attributes = A_BOLD | A_UNDERLINE;
+	e->map = level_number;
 	return e;
 }
 

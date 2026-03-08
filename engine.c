@@ -268,6 +268,7 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target)
 				if (e->armor) entity->armor += e->armor;
 				if (e->arrows) entity->arrows += e->arrows;
 				if (e->gold) entity->gold += e->gold;
+				if (e->map) entity->map = e->map;
 				e->type = NONE;
 			}
 			if (e->type == STAIRCASE && entity_id == 0) {

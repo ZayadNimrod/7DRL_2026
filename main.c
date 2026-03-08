@@ -39,16 +39,20 @@ void render_map(Level* level)
 {
 	wclear(map_window);
 
+	Entity* player = &level->entities[0];
 	LevelGridInt player_vis = player_vision(level);
 	for (int i = level->entity_count - 1; i >= 0; i--) {
 		Entity* e = &level->entities[i];
-
+		if (e->type != NONE && player->map == level->level_number) {
+			e->explored = 1;
+		}
 		int attributes = e->attributes;
 		wcolor_set(map_window, e->color_pair, NULL);
 		if (e->type==NONE || !e->explored) {
 			continue;
 		}
 		else if (player_vis.tiles[e->position.x][e->position.y] == 0) {
+			if (!e->is_static) continue;
 			wcolor_set(map_window, e->color_pair+128, NULL);
 		}
 		wattron(map_window, attributes);
@@ -116,7 +120,7 @@ int main()
 
 	Level level = { 0 };
 	level.logger = &logger;
-	level = init_level(0, &level);
+	level = init_level(1, &level);
 
 	map_window = newwin(LEVEL_HEIGHT, LEVEL_WIDTH, 0, 0);
 	log_window = newwin(MAX_LOGS, MAX_LOG_LEN, LEVEL_HEIGHT - MAX_LOGS, LEVEL_WIDTH);
