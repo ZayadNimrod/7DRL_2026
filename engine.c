@@ -174,6 +174,7 @@ int deal_damage(Level* level, size_t attacker_id, size_t target_id, int damage)
 		target->type = NONE;
 		sprintf(log_buf, "%s died\n", target->name);
 		log_msg(level->logger, log_buf);
+		make_lookup(level);
 	}
 	return damage;
 }
@@ -199,46 +200,38 @@ int entity_attack(Level* level, size_t attacker_id, size_t target_id)
 int entity_walk(Level* level, size_t entity_id, Vector2Int target)
 {
 	Entity* entity = &level->entities[entity_id];
-	if (entity->type == NONE)
-		return -1;
-	if (entity->inverse_speed == 0)
-		return -1;
+	if (entity->type == NONE) return -1;
+	if (entity->inverse_speed == 0) return -1;
 
-	PathfindingResult path = pathfind(level, target);
-	Vector2Int p = entity->position;
-	int current_dist = path.distance[p.x][p.y];
-	Vector2Int dir = { 0 };
-	for (int x = p.x - 1; x <= p.x + 1; x++) {
-		for (int y = p.y - 1; y <= p.y + 1; y++) {
-			if (x < 0)
-				continue;
-			if (y < 0)
-				continue;
-			if (x >= LEVEL_WIDTH)
-				continue;
-			if (y >= LEVEL_HEIGHT)
-				continue;
-			if (x == p.x && y == p.y)
-				continue;
-			if (path.distance[x][y] < current_dist) {
-				dir.x = x - p.x;
-				dir.y = y - p.y;
-				current_dist = path.distance[x][y];
+	Vector2Int dir = { target.x - entity->position.x, target.y - entity->position.y };
+	if (dir.x < -1 || dir.x > 1 || dir.y < -1 || dir.y > 1) {
+		PathfindingResult path = pathfind(level, target);
+		Vector2Int p = entity->position;
+		int current_dist = path.distance[p.x][p.y];
+		for (int x = p.x - 1; x <= p.x + 1; x++) {
+			for (int y = p.y - 1; y <= p.y + 1; y++) {
+				if (x < 0) continue;
+				if (y < 0) continue;
+				if (x >= LEVEL_WIDTH) continue;
+				if (y >= LEVEL_HEIGHT) continue;
+				if (x == p.x && y == p.y) continue;
+				if (path.distance[x][y] < current_dist) {
+					dir.x = x - p.x;
+					dir.y = y - p.y;
+					current_dist = path.distance[x][y];
+				}
 			}
 		}
 	}
-	if (dir.x == 0 && dir.y == 0)
-		return -1;
+	if (dir.x == 0 && dir.y == 0) return -1;
 	Vector2Int desired_position = vec2add(entity->position, dir);
 
 	EntityIdList entities_there = entities_at_location(level, desired_position);
 	for (size_t i = 0; i < entities_there.count; i++) {
 		size_t e_id = entities_there.entity_ids[i];
 		Entity* e = &level->entities[e_id];
-		if (e->bumpable)
-			return entity_attack(level, entity_id, e_id);
-		if (e->blocking)
-			return -1;
+		if (e->bumpable) return entity_attack(level, entity_id, e_id);
+		if (e->blocking) return -1;
 	}
 	entity->impetus_to_move++;
 	if (entity->impetus_to_move >= entity->inverse_speed) {
@@ -250,18 +243,18 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target)
 			if (e->type == ITEM) {
 				sprintf(log_buf, "Picked up %s", e->name);
 				log_msg(level->logger, log_buf);
-				if (e->hp)
-					entity->hp += e->hp;
-				if (e->armor)
-					entity->armor += e->armor;
-				if (e->arrows)
-					entity->arrows += e->arrows;
-				if (e->gold)
-					entity->gold += e->gold;
+				if (e->hp) entity->hp += e->hp;
+				if (e->armor) entity->armor += e->armor;
+				if (e->arrows) entity->arrows += e->arrows;
+				if (e->gold) entity->gold += e->gold;
 				e->type = NONE;
 			}
-			make_lookup(level);
+			if (e->type == STAIRCASE && entity_id == 0) {
+				sprintf(log_buf, "Press > to go deeper...");
+				log_msg(level->logger, log_buf);
+			}
 		}
+		make_lookup(level);
 		return 1;
 	}
 	return 0;
@@ -274,6 +267,7 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target)
  */
 int tick_level(Level* level, InputAction input)
 {
+	make_lookup(level);
 	int get_more_input = 0;
 	switch (input.type) {
 	case WALK:
