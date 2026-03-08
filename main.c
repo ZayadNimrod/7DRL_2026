@@ -10,6 +10,8 @@ WINDOW* stat_window;
 
 void render_stats(Level* level)
 {
+
+	wclear(stat_window);
 	Entity* player = &level->entities[0];
 
 	char numbuf[3] = {0};
