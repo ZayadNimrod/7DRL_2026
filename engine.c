@@ -227,6 +227,10 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target)
 		PathfindingResult path = pathfind(level, target);
 		Vector2Int p = entity->position;
 		int current_dist = path.distance[p.x][p.y];
+
+		// If you can't see it, you can't walk to it, I guess.
+		if (current_dist > entity->vision) return -1;
+
 		for (int x = p.x - 1; x <= p.x + 1; x++) {
 			for (int y = p.y - 1; y <= p.y + 1; y++) {
 				if (!is_in_bounds((Vector2Int){x, y})) continue;
