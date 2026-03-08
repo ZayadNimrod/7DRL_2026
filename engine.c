@@ -1,14 +1,32 @@
+#ifndef ENGINE
+#define ENGINE
+
 #include "entities.c"
 #include "log.c"
 #include "vector2int.h"
-#include <stdint.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
-char log_buf[1024];
+#define MAX_ENTITIES 4096
+#define LEVEL_WIDTH 60
+#define LEVEL_HEIGHT 30
 
-#include "ecs.c"
-#include "level_gen.c"
+typedef struct {
+	size_t entity_ids[32];
+	size_t count;
+} EntityIdList;
+
+typedef struct {
+	Entity entities[MAX_ENTITIES];
+	unsigned entity_count;
+	int level_number;
+	EntityIdList by_tile[LEVEL_WIDTH][LEVEL_HEIGHT];
+	logger_t* logger;
+} Level;
+// Entity #0 is always the player
+
+char log_buf[1024];
 
 Entity init_player()
 {
@@ -45,6 +63,8 @@ void make_lookup(Level* level) {
 	}
 }
 
+#include "level_gen.c"
+
 Level init_level(
 	int level_number,
 	Level* prev_level)
@@ -64,20 +84,7 @@ Level init_level(
 	generate_level(&level);
 
 	// randomise player position
-	Vector2Int player_pos;
-
-	while (1){
-
-		player_pos.x = rand() % LEVEL_WIDTH;
-		player_pos.y = rand() % LEVEL_HEIGHT;
-
-		
-		if (!is_walled(&level,player_pos)){
-			break;
-		}
-	}
-
-	Position(&level.entities[0], LEVEL_WIDTH / 2, LEVEL_HEIGHT / 2);
+	randomize_position(&level, &level.entities[0]);
 
 	make_lookup(&level);
 	return level;
@@ -311,3 +318,5 @@ int tick_level(Level* level, InputAction input)
 
 	return get_more_input;
 }
+
+#endif

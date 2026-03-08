@@ -64,6 +64,7 @@ void render_map(Level* world)
 		Entity* e = &world->entities[i];
 		display_t d = entity_char(e);
 		if (d.character != 0) {
+			d.attributes = COLOR_PAIR(2); // TODO: Make this light grey somehow
 			wattron(map_window, d.attributes);
 			Vector2Int position = e->position;
 			mvwaddch(map_window, position.y, position.x, d.character);

@@ -2,6 +2,7 @@
 #define ENTITIES_C
 #include "vector2int.h"
 #include <stdbool.h>
+#include <stddef.h>
 
 enum EntityType {
 	NONE,
@@ -23,7 +24,6 @@ typedef struct {
 	int impetus_to_attack; // When this hits attack_delay, the player can move one tile->
 	bool blocking; // Can you pathfind through this?
 	bool bumpable; // If you bump this, should you attack it?
-	int vision; // How many tiles away can this see?
 	int aggro_entity_id;
 	// These are things you can have in an inventory.
 	// If this is an item, picking it up will add those things to your inventory.
@@ -31,6 +31,9 @@ typedef struct {
 	int arrows;
 	int armor;
 	int gold;
+	int vision; // How many tiles away can this see?
+	int explored; // Has the player seen this tile before?
+	int is_static; // Whether this should update when it's not in the player's line of sight.
 } Entity; 
 
 // The following functions are helper functions for instantiating entities:
@@ -64,6 +67,7 @@ void Wall(Entity* e, int x, int y) {
 	e->type = WALL;
 	e->blocking = 1;
 	e->hp = 1000;
+	e->is_static = 1;
 	Position(e, x, y);
 }
 
@@ -75,37 +79,41 @@ void Goblin(Entity* e, int x, int y) {
 	Movement(e, 12);
 }
 
-void Arrows(Entity* e, int x, int y, int amount) {
-	e->name = "a bundle of arrows";
+void Item(Entity *e) {
 	e->type = ITEM;
+	e->is_static = 1;
+}
+
+void Arrows(Entity* e, int x, int y, int amount) {
+	Item(e);
+	e->name = "a bundle of arrows";
 	Position(e, x, y);
 	e->arrows = amount;
 }
 
 void Armor(Entity* e, int x, int y, int amount) {
+	Item(e);
 	e->name = "an armor shard";
-	e->type = ITEM;
 	Position(e, x, y);
 	e->armor = amount;
 }
 
 void Health(Entity* e, int x, int y, int amount) {
+	Item(e);
 	e->name = "a health potion";
-	e->type = ITEM;
 	Position(e, x, y);
 	e->hp = amount;
 }
 
 void Gold(Entity* e, int x, int y, int amount) {
+	Item(e);
 	e->name = "a bag of gold";
-	e->type = ITEM;
 	Position(e, x, y);
 	e->gold = amount;
 }
 
-void Staircase(Entity* e, int x, int y){
+void Staircase(Entity* e){
 	e->type = STAIRCASE;
-	Position(e, x, y);
 }
 
 #endif

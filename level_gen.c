@@ -1,4 +1,4 @@
-#include "ecs.c"
+#include "engine.c"
 #include "log.c"
 #include <stdbool.h>
 
@@ -211,20 +211,23 @@ void bsp_dungeon(Level* level, int width, int height)
 	free(tilemap);
 }
 
+/**
+ * Will put an entity somewhere random where there isn't anything else
+ */
+void randomize_position(Level* level, Entity* entity) {
+	while (1) {
+		entity->position.x = rand() % LEVEL_WIDTH;
+		entity->position.y = rand() % LEVEL_HEIGHT;
+
+		EntityIdList here = entities_at_location(level, entity->position);
+		// There should be only one entity here - the thing itself!
+		if (here.count == 1) return;
+	}
+}
+
 void generate_level(Level* level)
 {
 	bsp_dungeon(level, LEVEL_WIDTH, LEVEL_HEIGHT);
-
-	Vector2Int stair_pos;
-
-	while (1) {
-		stair_pos.x = rand() % LEVEL_WIDTH;
-		stair_pos.y = rand() % LEVEL_HEIGHT;
-
-		if (!is_walled(level,stair_pos)){
-			break;
-		}
-	}
-
-	Staircase(&level->entities[level->entity_count++],stair_pos.x,stair_pos.y);
+	Staircase(&level->entities[level->entity_count++]);
+	randomize_position(level, &level->entities[level->entity_count]);
 }
