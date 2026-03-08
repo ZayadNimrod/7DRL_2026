@@ -13,8 +13,8 @@
 #define LEVEL_HEIGHT 30
 
 int is_in_bounds(Vector2Int position) {
-	if (position.x < 0 || position.x > LEVEL_WIDTH) return 0;
-	if (position.y < 0 || position.y > LEVEL_HEIGHT) return 0;
+	if (position.x < 0 || position.x >= LEVEL_WIDTH) return 0;
+	if (position.y < 0 || position.y >= LEVEL_HEIGHT) return 0;
 	return 1;
 }
 
@@ -31,6 +31,10 @@ typedef struct {
 	logger_t* logger;
 } Level;
 // Entity #0 is always the player
+
+typedef struct {
+	int tiles[LEVEL_WIDTH][LEVEL_HEIGHT];
+} LevelGridInt;
 
 char log_buf[1024];
 
@@ -124,10 +128,6 @@ typedef struct {
 	Vector2Int target;
 } PathfindingResult;
 
-typedef struct {
-	int tiles[LEVEL_WIDTH][LEVEL_HEIGHT];
-} LevelGridInt;
-
 #define WALL_LARGE_NUMBER 100000
 PathfindingResult pathfind(Level* level, Vector2Int target) {
 	PathfindingResult result = {0};
@@ -152,13 +152,14 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 				if (result.distance[x][y] == -1) {
 					for (int xo=-1; xo<=1; xo++) {
 						for (int yo=-1; yo<=1; yo++) {
-							if (!is_in_bounds((Vector2Int){x+xo, y+yo})) continue;
-							int d = result.distance[x+xo][y+yo];
-							if (d != -1 && d != WALL_LARGE_NUMBER) {
-								int new_distance = d+1;
-								if (result.distance[x][y] == -1 || result.distance[x][y] > new_distance) {
-									result.distance[x][y] = new_distance;
-									changed = 1;
+							if (is_in_bounds((Vector2Int){x+xo, y+yo})) {
+								int d = result.distance[x+xo][y+yo];
+								if (d != -1 && d != WALL_LARGE_NUMBER) {
+									int new_distance = d+1;
+									if (result.distance[x][y] == -1 || result.distance[x][y] > new_distance) {
+										result.distance[x][y] = new_distance;
+										changed = 1;
+									}
 								}
 							}
 						}
@@ -337,15 +338,16 @@ int tick_level(Level* level, InputAction input)
 }
 
 LevelGridInt player_vision(Level* level) {
-	LevelGridInt result = {0};
 	PathfindingResult player_pf = pathfind(level, level->entities[0].position);
+	LevelGridInt result = {0};
 	for (int y = 0; y<LEVEL_HEIGHT; y++) {
 		for (int x = 0; x<LEVEL_WIDTH; x++) {
 			if (player_pf.distance[x][y] <= level->entities[0].vision) {
 				for (int yo=-1; yo<=1; yo++) {
 					for (int xo=-1; xo<=1; xo++) {
-						if (!is_in_bounds((Vector2Int){x+xo, y+yo})) continue;
-						result.tiles[x+xo][y+yo] = 1;
+						if (is_in_bounds((Vector2Int){x+xo, y+yo})) {
+							result.tiles[x+xo][y+yo] = 1;
+						}
 					}
 				}
 			}

@@ -43,33 +43,37 @@ typedef struct {
 
 // The following functions are helper functions for instantiating entities:
 
-void Position(Entity* e, int x, int y) {
+Entity* Position(Entity* e, int x, int y) {
 	e->position.x = x;
 	e->position.y = y;
+	return e;
 }
 
-void Combat(Entity* e, int hp, int damage, int attack_delay) {
+Entity* Combat(Entity* e, int hp, int damage, int attack_delay) {
 	e->hp = hp;
 	e->damage = damage;
 	e->attack_delay = attack_delay;
 	e->bumpable = 1;
 	e->vision = 8;
+	return e;
 }
 
-void Movement(Entity* e, int inverse_speed) {
+Entity* Movement(Entity* e, int inverse_speed) {
 	e->inverse_speed = inverse_speed;
+	return e;
 }
 
-void Player(Entity* e) {
+Entity* Player(Entity* e) {
 	e->type = PLAYER;
 	e->name = "Dormin";
 	e->avatar = '@';
 	e->color_pair = GC_player;
 	Combat(e, 10, 5, 10);
 	Movement(e, 10);
+	return e;
 }
 
-void Wall(Entity* e, int x, int y) {
+Entity* Wall(Entity* e) {
 	e->name = "Wall";
 	e->type = WALL;
 	e->avatar = '#';
@@ -77,66 +81,93 @@ void Wall(Entity* e, int x, int y) {
 	e->hp = 1000;
 	e->is_static = 1;
 	e->color_pair = GC_wall;
-	Position(e, x, y);
+	return e;
 }
 
-void Goblin(Entity* e, int x, int y) {
+Entity* Goblin(Entity* e) {
 	e->name = "Goblin";
 	e->type = ENEMY;
 	e->avatar = 'g';
 	e->color_pair = GC_goblin;
-	Position(e, x, y);
 	Combat(e, 15, 1, 15);
 	Movement(e, 12);
+	return e;
 }
 
-void Item(Entity *e) {
+Entity* Item(Entity *e) {
 	e->type = ITEM;
 	e->is_static = 1;
+	return e;
 }
 
-void Arrows(Entity* e, int x, int y, int amount) {
+Entity* Arrows(Entity* e, int amount) {
 	Item(e);
 	e->name = "a bundle of arrows";
 	e->avatar = '&';
-	Position(e, x, y);
 	e->arrows = amount;
 	e->color_pair = GC_arrows;
+	return e;
 }
 
-void Armor(Entity* e, int x, int y, int amount) {
+Entity* SingleArrow(Entity* e) {
+	Arrows(e, 1);
+	e->name = "an arrow";
+	e->avatar = '1';
+	return e;
+}
+
+Entity* Armor(Entity* e, int amount) {
 	Item(e);
 	e->name = "an armor shard";
 	e->avatar = '\'';
 	e->color_pair = GC_armor;
-	Position(e, x, y);
 	e->armor = amount;
+	return e;
 }
 
-void Health(Entity* e, int x, int y, int amount) {
+Entity* Health(Entity* e, int amount) {
 	Item(e);
 	e->name = "a health potion";
 	e->avatar = '+';
 	e->color_pair = GC_health;
 	e->attributes = A_BOLD;
-	Position(e, x, y);
 	e->hp = amount;
+	return e;
 }
 
-void Gold(Entity* e, int x, int y, int amount) {
+Entity* Gold(Entity* e, int amount) {
 	Item(e);
 	e->name = "a bag of gold";
 	e->avatar = '$';
 	e->color_pair = GC_gold;
-	Position(e, x, y);
 	e->gold = amount;
+	return e;
 }
 
-void Staircase(Entity* e){
+Entity* SmallGold(Entity* e) {
+	Gold(e, 3);
+	e->name = "a small handful of coins";
+	return e;
+}
+
+Entity* MediumGold(Entity* e) {
+	Gold(e, 10);
+	e->name = "a nice chunk of change";
+	return e;
+}
+
+Entity* LargeGold(Entity* e) {
+	Gold(e, 18);
+	e->name = "a massive wad of wonga!";
+	return e;
+}
+
+Entity* Staircase(Entity* e){
 	e->type = STAIRCASE;
 	e->avatar = '>';
 	e->is_static = 1;
 	e->color_pair = GC_staircase;
+	return e;
 }
 
 #endif

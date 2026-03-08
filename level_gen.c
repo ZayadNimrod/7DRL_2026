@@ -9,87 +9,60 @@ typedef struct {
 	int right;
 } rect_t;
 
-typedef struct {
-	int cost;
-	bool individual;
-	int quantity; // ignore if individual
-	void (*function)(void); // pointer to a callback. Has different args depending on if this is an individual or stack item
-} cost_t;
+rect_t WHOLE_LEVEL = {0, LEVEL_HEIGHT-1, 0, LEVEL_WIDTH-1};
 
-#define COSTS_LEN 8
-const cost_t cost_table[COSTS_LEN] = {
-	{
-		.cost = 2,
-		.individual = true,
-		.function = (void*)Goblin,
-	},
-	{
-		.cost = 1,
-		.individual = false,
-		.quantity = 3,
-		.function = (void*)Gold,
-	},
-	{
-		.cost = 3,
-		.individual = false,
-		.quantity = 10,
-		.function = (void*)Gold,
-	},
-	{
-		.cost = 5,
-		.individual = false,
-		.quantity = 18,
-		.function = (void*)Gold,
-	},
-	{
-		.cost = 5,
-		.individual = false,
-		.quantity = 2,
-		.function = (void*)Armor,
-	},
-	{
-		.cost = 5,
-		.individual = false,
-		.quantity = 1,
-		.function = (void*)Health,
-	},
-	{
-		.cost = 1,
-		.individual = false,
-		.quantity = 1,
-		.function = (void*)Arrows,
-	},
-	{
-		.cost = 2,
-		.individual = false,
-		.quantity = 3,
-		.function = (void*)Arrows,
-	}
-};
+Entity* new(Level* level) {
+	return &level->entities[level->entity_count++];
+}
 
-void buy_in_budget(Level* level, int* budget, rect_t bounding_box, char* tilemap, int width)
+void randomize_position(Level* level, Entity* entity);
+void randomize_position_bb(Level* level, Entity* e, rect_t bb);
+
+int buy_in_budget(Level* level, rect_t bounding_box, LevelGridInt* map)
 {
-	int idx = rand() % COSTS_LEN;
-	cost_t proposed = cost_table[idx];
-	if (proposed.cost > *budget)
-		return;
-
-	int x;
-	int y;
-
-	do {
-		x = rand() % (bounding_box.right - bounding_box.left) + bounding_box.left;
-		y = rand() % (bounding_box.bottom - bounding_box.top) + bounding_box.top;
-	} while (tilemap[y * width + x]);
-
-	if (proposed.individual) {
-		*budget -= proposed.cost;
-		((void (*)(Entity*, int, int))(proposed.function))(&level->entities[level->entity_count++], x, y);
-	} else {
-		int count = rand() % (*budget / proposed.cost) + 1;
-		*budget -= proposed.cost * count;
-		((void (*)(Entity*, int, int, int))(proposed.function))(&level->entities[level->entity_count++], x, y, count * proposed.quantity);
+	int idx = rand() % 8; // Increment this when you add more cases below:
+	int cost = 0;
+	Entity* e;
+	switch (idx) {
+		case 0:
+			cost = 2;
+			e = Goblin(new(level));
+			break;
+		case 1:
+			cost = 1;
+			e = SmallGold(new(level));
+			break;
+		case 2:
+			cost = 3;
+			e = MediumGold(new(level));
+			break;
+		case 3:
+			cost = 5;
+			e = LargeGold(new(level));
+			break;
+		case 4:
+			cost = 5;
+			e = Armor(new(level), 18);
+			break;
+		case 5:
+			cost = 5;
+			e = Health(new(level), 1);
+			break;
+		case 6:
+			cost = 1;
+			e = SingleArrow(new(level));
+			break;
+		case 7:
+			cost = 2;
+			e = Arrows(new(level), 3);
+			break;
+		default:
+			return 1;
 	}
+	do {
+		randomize_position_bb(level, e, bounding_box);
+	} while (map->tiles[e->position.x][e->position.y]);
+	return cost;
 }
 
 int ilog2(int i)
@@ -102,21 +75,21 @@ int ilog2(int i)
 	return o;
 }
 
-void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char* tilemap, unsigned width, unsigned height)
+void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, LevelGridInt* map)
 {
-	if (remaining_depth == 0 || bounding_box.top - bounding_box.bottom < 4 || bounding_box.right - bounding_box.left < 4) {
+	if (remaining_depth == 0 || bounding_box.bottom - bounding_box.top < 4 || bounding_box.right - bounding_box.left < 4) {
 		// TODO perturb these
 		unsigned x_start = bounding_box.left + 1;
 		unsigned x_end = bounding_box.right - 1;
-		unsigned y_start = bounding_box.bottom + 1;
-		unsigned y_end = bounding_box.top - 1;
+		unsigned y_start = bounding_box.top + 1;
+		unsigned y_end = bounding_box.bottom - 1;
 
 		int max_budget = 0;
 
 		// Carve out the room
 		for (unsigned x = x_start; x <= x_end; x++) {
 			for (unsigned y = y_start; y <= y_end; y++) {
-				tilemap[y * width + x] = 0;
+				map->tiles[x][y] = 0;
 				max_budget++;
 			}
 		}
@@ -125,8 +98,8 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char*
 		max_budget *= (level->level_number + 1);
 		max_budget = ilog2(max_budget);
 		int budget = rand() % max_budget;
-		while (budget) {
-			buy_in_budget(level, &budget, bounding_box, tilemap, width);
+		while (budget > 0) {
+			budget -= buy_in_budget(level, bounding_box, map);
 		}
 
 	} else {
@@ -138,8 +111,8 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char*
 		if (split_direction) {
 			int top = bounding_box.top;
 			int bottom = bounding_box.bottom;
-			// unsigned halfrange = (top - bottom) / 2;
-			// unsigned split_point = rand() % halfrange + halfrange / 2 + bottom;
+			// unsigned halfrange = (bottom - top) / 2;
+			// unsigned split_point = rand() % halfrange + halfrange / 2 + top;
 			unsigned split_point = (top + bottom) / 2;
 			bb1.top = top;
 			bb1.bottom = split_point;
@@ -159,21 +132,21 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char*
 		}
 
 		// Build the sub-partitions
-		bsp_iter(level, remaining_depth - 1, bb1, tilemap, width, height);
-		bsp_iter(level, remaining_depth - 1, bb2, tilemap, width, height);
+		bsp_iter(level, remaining_depth - 1, bb1, map);
+		bsp_iter(level, remaining_depth - 1, bb2, map);
 
 		// Join the sub-partitions
 
 		Vector2Int p1, p2;
 		do {
-			p1.y = rand() % (bb1.top - bb1.bottom) + bb1.bottom;
+			p1.y = rand() % (bb1.bottom - bb1.top) + bb1.top;
 			p1.x = rand() % (bb1.right - bb1.left) + bb1.left;
-		} while (tilemap[p1.y * width + p1.x]);
+		} while (map->tiles[p1.x][p1.y]);
 
 		do {
-			p2.y = rand() % (bb2.top - bb2.bottom) + bb2.bottom;
+			p2.y = rand() % (bb2.bottom - bb2.top) + bb2.top;
 			p2.x = rand() % (bb2.right - bb2.left) + bb2.left;
-		} while (tilemap[p2.y * width + p2.x]);
+		} while (map->tiles[p2.x][p2.y]);
 
 		int x_begin = p1.x > p2.x ? p2.x : p1.x;
 		int x_end = p1.x > p2.x ? p1.x : p2.x;
@@ -183,51 +156,60 @@ void bsp_iter(Level* level, unsigned remaining_depth, rect_t bounding_box, char*
 
 		unsigned join_direction = rand() % 2;
 		for (int x = x_begin; x <= x_end; x++) {
-			tilemap[y_begin * width + x] = 0;
+			map->tiles[x][y_begin] = 0;
 		}
 		for (int y = y_begin; y <= y_end; y++) {
-			tilemap[y * width + x_end] = 0;
+			map->tiles[x_end][y] = 0;
 		}
 	}
 }
 
-void bsp_dungeon(Level* level, int width, int height)
+void bsp_dungeon(Level* level)
 {
 	// Call bsp_iter on the top level
-	char* tilemap = malloc(sizeof(char) * width * height);
-	for (int i = 0; i < width * height; i++) {
-		tilemap[i] = 1;
+	LevelGridInt map;
+	for (int y = 0; y < LEVEL_HEIGHT; y++) {
+		for (int x = 0; x < LEVEL_WIDTH; x++) {
+			map.tiles[x][y] = 1;
+		}
 	}
-	bsp_iter(level, 4, (rect_t) { .bottom = 0, .top = height - 1, .left = 0, .right = width - 1 }, tilemap, width, height);
-
+	bsp_iter(level, 4, WHOLE_LEVEL, &map);
 	// For every filled cell in the output tilemap, place a wall.
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {
-			if (tilemap[y * width + x]) {
-				Wall(&level->entities[level->entity_count++], x, y);
+	for (int y = 0; y < LEVEL_HEIGHT; y++) {
+		for (int x = 0; x < LEVEL_WIDTH; x++) {
+			if (map.tiles[x][y]) {
+				Position(Wall(new(level)), x, y);
 			}
 		}
 	}
-	free(tilemap);
+}
+
+int in_bb(rect_t bb, Vector2Int p) {
+	return p.x <= bb.left || p.x > bb.right || p.y <= bb.top || p.y > bb.bottom;
 }
 
 /**
  * Will put an entity somewhere random where there isn't anything else
  */
 void randomize_position(Level* level, Entity* entity) {
-	while (1) {
-		entity->position.x = rand() % LEVEL_WIDTH;
-		entity->position.y = rand() % LEVEL_HEIGHT;
+	randomize_position_bb(level, entity, WHOLE_LEVEL);
+}
 
-		EntityIdList here = entities_at_location(level, entity->position);
-		// There should be only one entity here - the thing itself!
-		if (here.count == 1) return;
-	}
+void randomize_position_bb(Level* level, Entity* e, rect_t bb) {
+	int width = bb.right - bb.left;
+	int height = bb.bottom - bb.top;
+	Vector2Int* p = &e->position;
+	EntityIdList here;
+	do {
+		p->x = bb.left + rand() % width;
+		p->y = bb.top  + rand() % height;
+		here = entities_at_location(level, *p);
+	} while (here.count > 1);
 }
 
 void generate_level(Level* level)
 {
-	bsp_dungeon(level, LEVEL_WIDTH, LEVEL_HEIGHT);
+	bsp_dungeon(level);
 	Staircase(&level->entities[level->entity_count++]);
 	randomize_position(level, &level->entities[level->entity_count-1]);
 }
