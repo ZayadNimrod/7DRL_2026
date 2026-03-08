@@ -12,8 +12,9 @@ void render_stats(Level* level)
 {
 	Entity* player = &level->entities[0];
 
-	char numbuf[3];
+	char numbuf[3] = {0};
 	wmove(stat_window,1,1);
+	// TODO: FIX where number gets shorter display issue
 	waddstr(stat_window, "HP:");
 	sprintf(numbuf, "%i",player->hp);
 	waddstr(stat_window,numbuf);

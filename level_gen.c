@@ -229,5 +229,5 @@ void generate_level(Level* level)
 {
 	bsp_dungeon(level, LEVEL_WIDTH, LEVEL_HEIGHT);
 	Staircase(&level->entities[level->entity_count++]);
-	randomize_position(level, &level->entities[level->entity_count]);
+	randomize_position(level, &level->entities[level->entity_count-1]);
 }

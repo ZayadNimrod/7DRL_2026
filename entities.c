@@ -126,6 +126,7 @@ void Gold(Entity* e, int x, int y, int amount) {
 void Staircase(Entity* e){
 	e->type = STAIRCASE;
 	e->avatar = '>';
+	e->is_static = 1;
 }
 
 #endif
