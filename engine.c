@@ -270,7 +270,7 @@ int entity_walk(Level* level, size_t entity_id, Vector2Int target)
 				e->type = NONE;
 			}
 			if (e->type == STAIRCASE && entity_id == 0) {
-				sprintf(log_buf, "Press > to go deeper...");
+				sprintf(log_buf, "Press > to go deeper... if you dare >:)");
 				log_msg(level->logger, log_buf);
 			}
 		}

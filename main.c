@@ -1,6 +1,7 @@
 
 #include "engine.c"
 #include "log.c"
+#include "colors.h"
 #include <ncurses.h>
 #include <stdlib.h>
 
@@ -10,13 +11,11 @@ WINDOW* stat_window;
 
 void render_stats(Level* level)
 {
-
 	wclear(stat_window);
 	Entity* player = &level->entities[0];
 
 	char numbuf[3] = {0};
 	wmove(stat_window,1,1);
-	// TODO: FIX where number gets shorter display issue
 	waddstr(stat_window, "HP:");
 	sprintf(numbuf, "%i",player->hp);
 	waddstr(stat_window,numbuf);
@@ -44,21 +43,20 @@ void render_map(Level* level)
 	for (int i = level->entity_count - 1; i >= 0; i--) {
 		Entity* e = &level->entities[i];
 
-		int attributes = 0;
+		int attributes = e->attributes;
+		wcolor_set(map_window, e->color_pair, NULL);
 		if (e->type==NONE || !e->explored) {
-			attributes |= A_INVIS;
+			continue;
 		}
 		else if (player_vis.tiles[e->position.x][e->position.y] == 0) {
-			attributes |= A_DIM;
+			wcolor_set(map_window, e->color_pair+128, NULL);
 		}
-		wattron(map_window, COLOR_PAIR(e->color_pair));
 		wattron(map_window, attributes);
 		Vector2Int position = e->position;
 		mvwaddch(map_window, position.y, position.x, e->avatar);
-		wattroff(map_window, COLOR_PAIR(e->color_pair));
 		wattroff(map_window, attributes);
 
-		wattron(map_window, COLOR_PAIR(0));
+		wcolor_set(map_window, 0, NULL);
 	}
 
 	wrefresh(map_window);
@@ -108,16 +106,8 @@ int main()
 	srand(0);
 
 	initscr();
-	start_color();
-	init_pair(0, COLOR_WHITE, COLOR_BLACK);
-	init_pair(1, COLOR_RED, COLOR_BLACK);
-	// init_pair(2, COLOR_ORANGE, COLOR_BLACK);
-	init_pair(2, COLOR_YELLOW, COLOR_BLACK);
-	init_pair(3, COLOR_GREEN, COLOR_BLACK);
-	init_pair(4, COLOR_CYAN, COLOR_BLACK);
-	init_pair(5, COLOR_BLUE, COLOR_BLACK);
-	init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
-	init_pair(7, COLOR_BLACK, COLOR_BLACK);
+	define_colors();
+	color_set(0, NULL);
 
 	curs_set(0); // hide cursor
 	noecho();

@@ -9,7 +9,7 @@ CLIBS	= -lncurses
 
 $(shell mkdir -p bin tests)
 
-$(EXECUTABLE_PATH): **.c
+$(EXECUTABLE_PATH): **.c **.h
 	gcc $(CFLAGS_DEBUG) -o $@ main.c $(CLIBS)
 
 build: $(EXECUTABLE_PATH)

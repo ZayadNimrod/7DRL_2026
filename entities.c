@@ -1,8 +1,10 @@
 #ifndef ENTITIES_C
 #define ENTITIES_C
 #include "vector2int.h"
+#include "colors.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <ncurses.h>
 
 enum EntityType {
 	NONE,
@@ -35,8 +37,8 @@ typedef struct {
 	int explored; // Has the player seen this tile before?
 	int is_static; // Whether this should update when it's not in the player's line of sight.
 	char avatar;
-	short color_pair;
-	int ncurses_attributes; // Combine attributes like A_BOLD || A_UNDERLINE
+	enum GameColors color_pair;
+	int attributes; // Combine attributes like A_BOLD || A_UNDERLINE
 } Entity; 
 
 // The following functions are helper functions for instantiating entities:
@@ -62,6 +64,7 @@ void Player(Entity* e) {
 	e->type = PLAYER;
 	e->name = "Dormin";
 	e->avatar = '@';
+	e->color_pair = GC_player;
 	Combat(e, 10, 5, 10);
 	Movement(e, 10);
 }
@@ -73,6 +76,7 @@ void Wall(Entity* e, int x, int y) {
 	e->blocking = 1;
 	e->hp = 1000;
 	e->is_static = 1;
+	e->color_pair = GC_wall;
 	Position(e, x, y);
 }
 
@@ -80,7 +84,7 @@ void Goblin(Entity* e, int x, int y) {
 	e->name = "Goblin";
 	e->type = ENEMY;
 	e->avatar = 'g';
-	e->color_pair = 1;
+	e->color_pair = GC_goblin;
 	Position(e, x, y);
 	Combat(e, 15, 1, 15);
 	Movement(e, 12);
@@ -97,12 +101,14 @@ void Arrows(Entity* e, int x, int y, int amount) {
 	e->avatar = '&';
 	Position(e, x, y);
 	e->arrows = amount;
+	e->color_pair = GC_arrows;
 }
 
 void Armor(Entity* e, int x, int y, int amount) {
 	Item(e);
 	e->name = "an armor shard";
 	e->avatar = '\'';
+	e->color_pair = GC_armor;
 	Position(e, x, y);
 	e->armor = amount;
 }
@@ -111,6 +117,8 @@ void Health(Entity* e, int x, int y, int amount) {
 	Item(e);
 	e->name = "a health potion";
 	e->avatar = '+';
+	e->color_pair = GC_health;
+	e->attributes = A_BOLD;
 	Position(e, x, y);
 	e->hp = amount;
 }
@@ -119,6 +127,7 @@ void Gold(Entity* e, int x, int y, int amount) {
 	Item(e);
 	e->name = "a bag of gold";
 	e->avatar = '$';
+	e->color_pair = GC_gold;
 	Position(e, x, y);
 	e->gold = amount;
 }
@@ -127,6 +136,7 @@ void Staircase(Entity* e){
 	e->type = STAIRCASE;
 	e->avatar = '>';
 	e->is_static = 1;
+	e->color_pair = GC_staircase;
 }
 
 #endif
