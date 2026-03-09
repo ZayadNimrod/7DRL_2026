@@ -20,7 +20,7 @@ void randomize_position_bb(Level* level, Entity* e, rect_t bb);
 
 int buy_in_budget(Level* level, rect_t bounding_box, LevelGridInt* map)
 {
-	int idx = rand() % 8; // Increment this when you add more cases below:
+	int idx = rand() % 10; // Increment this when you add more cases below:
 	int cost = 0;
 	Entity* e;
 	switch (idx) {
@@ -55,6 +55,14 @@ int buy_in_budget(Level* level, rect_t bounding_box, LevelGridInt* map)
 		case 7:
 			cost = 2;
 			e = Arrows(new(level), 3);
+			break;		
+		case 8:
+			cost = 2;
+			e = Goblin(new(level));
+			break;
+		case 9:
+			cost = 2;
+			e = Goblin(new(level));
 			break;
 		default:
 			return 1;
