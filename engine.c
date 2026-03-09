@@ -76,14 +76,12 @@ void make_lookup(Level* level) {
 #include "level_gen.c"
 
 
-
-#define WALL_LARGE_NUMBER 100000
-
 typedef struct {
 	int distance[LEVEL_WIDTH][LEVEL_HEIGHT];
 	Vector2Int target;
 } PathfindingResult;
 
+#define WALL_LARGE_NUMBER 100000
 PathfindingResult pathfind(Level* level, Vector2Int target) {
 	PathfindingResult result = {0};
 	result.target = target;
@@ -107,13 +105,14 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 				if (result.distance[x][y] == -1) {
 					for (int xo=-1; xo<=1; xo++) {
 						for (int yo=-1; yo<=1; yo++) {
-							if (is_in_bounds((Vector2Int){x+xo, y+yo})) continue;
-							int d = result.distance[x+xo][y+yo];
-							if (d != -1 && d != WALL_LARGE_NUMBER) {
-								int new_distance = d+1;
-								if (result.distance[x][y] == -1 || result.distance[x][y] > new_distance) {
-									result.distance[x][y] = new_distance;
-									changed = 1;
+							if (is_in_bounds((Vector2Int){x+xo, y+yo})) {
+								int d = result.distance[x+xo][y+yo];
+								if (d != -1 && d != WALL_LARGE_NUMBER) {
+									int new_distance = d+1;
+									if (result.distance[x][y] == -1 || result.distance[x][y] > new_distance) {
+										result.distance[x][y] = new_distance;
+										changed = 1;
+									}
 								}
 							}
 						}
@@ -125,16 +124,18 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 	return result;
 }
 
+
 LevelGridInt player_vision(Level* level) {
-	LevelGridInt result = {0};
 	PathfindingResult player_pf = pathfind(level, level->entities[0].position);
+	LevelGridInt result = {0};
 	for (int y = 0; y<LEVEL_HEIGHT; y++) {
 		for (int x = 0; x<LEVEL_WIDTH; x++) {
 			if (player_pf.distance[x][y] <= level->entities[0].vision) {
 				for (int yo=-1; yo<=1; yo++) {
 					for (int xo=-1; xo<=1; xo++) {
-						if (is_in_bounds((Vector2Int){x+xo, y+yo})) continue;
-						result.tiles[x+xo][y+yo] = 1;
+						if (is_in_bounds((Vector2Int){x+xo, y+yo})) {
+							result.tiles[x+xo][y+yo] = 1;
+						}
 					}
 				}
 			}
@@ -156,6 +157,7 @@ void update_player_vision(Level* level) {
 		}
 	}
 }
+
 
 
 Level init_level(
