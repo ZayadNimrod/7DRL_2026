@@ -125,12 +125,6 @@ PathfindingResult pathfind(Level* level, Vector2Int target) {
 	return result;
 }
 
-
-typedef struct {
-	int tiles[LEVEL_WIDTH][LEVEL_HEIGHT];
-} LevelGridInt;
-
-
 LevelGridInt player_vision(Level* level) {
 	LevelGridInt result = {0};
 	PathfindingResult player_pf = pathfind(level, level->entities[0].position);
